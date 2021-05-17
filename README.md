@@ -3,4 +3,4 @@ The goal of this demo is to serve as an example of one approach to an asynchrono
 
 Please check our [documentation](https://docs.colyseus.io/demo/turn-based-tanks/) for more information about utilizing this demo
 
-![Screenshot](screenshot.png?raw=1)
+![Screenshot](Screenshot.PNG)
