@@ -88,11 +88,6 @@ public class ExampleManager : ColyseusManager<ExampleManager>
         set { userName = value; }
     }
 
-    public void BeginServerConnection()
-    {
-        InitializeClient();
-    }
-
     /// <summary>
     ///     <see cref="MonoBehaviour" /> callback when a script is enabled just before any of the Update methods are called the
     ///     first time.

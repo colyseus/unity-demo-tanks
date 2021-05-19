@@ -267,7 +267,7 @@ public class ExampleRoomController
     {
         _colyseusSettings = settings;
 
-        ColyseusClient.onAddRoom += OnAddRoom;
+        ColyseusClient.onAddRoom += AddRoom;
     }
 
     public void SetRoomOptions(Dictionary<string, object> options)
@@ -294,25 +294,14 @@ public class ExampleRoomController
     }
 
     /// <summary>
-    ///     Handler for the <see cref="ColyseusClient.onAddRoom" /> event.
-    /// </summary>
-    /// <param name="roomToAdd"></param>
-    private void OnAddRoom(IColyseusRoom roomToAdd)
-    {
-        _ = AddRoom(roomToAdd);
-    }
-
-    /// <summary>
-    ///     Adds the given room to <see cref="rooms" /> and
-    ///     initiates its connection to the server.
+    ///     Adds the given room to <see cref="rooms" />
     /// </summary>
     /// <param name="roomToAdd"></param>
     /// <returns></returns>
-    public async Task AddRoom(IColyseusRoom roomToAdd)
+    public void AddRoom(IColyseusRoom roomToAdd)
     {
-        roomToAdd.OnLeave += code => { rooms.Remove(roomToAdd); };
+        roomToAdd.OnLeave += code => rooms.Remove(roomToAdd);
         rooms.Add(roomToAdd);
-        await roomToAdd.Connect();
     }
 
     /// <summary>
