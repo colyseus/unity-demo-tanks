@@ -1,14 +1,12 @@
 
 import { Client } from "colyseus";
 import { TanksRoom } from "../TanksRoom";
-import { EnvironmentBuilder } from "./environmentController";
+import { EnvironmentBuilder } from "./EnvironmentController";
 import { TurnContainer } from "./turnModel";
 import { Vector2, Vector3 } from "three";
 
 import { GameRules } from "./gameRules";
-import { WeaponController } from "./weaponController";
-import { Weapon } from "./weaponModel";
-import { ColyseusNetworkedUser } from "../schema/ColyseusRoomState";
+import { Player, PlayerReadyState } from "../schema/TanksState";
 
 const logger = require("../../helpers/logger.js");
 
@@ -17,39 +15,9 @@ const CurrentState = "currentGameState";
 const LastState = "lastGameState";
 const ClientReadyState = "readyState";
 const GeneralMessage = "generalMessage";
-
-/** Enum for game state */
-const TanksServerGameState = {
-    None: "None",
-    Waiting: "Waiting",
-    BeginRound: "BeginRound",
-    SimulateRound: "SimulateRound",
-    EndRound: "EndRound"
-};
  
 /**The object container to host the custom methods called by the client */
 let tanksCustomMethods: any = {};
-
-/**
- * The primary game loop on the server
- * @param roomRef Reference to the room
- * @param deltaTime The server delta time in seconds
- */
-let gameLoop = function (roomRef: TanksRoom, deltaTime: number){
-
-    // Update the game state
-    switch (getGameState(roomRef, CurrentState)) {
-        case TanksServerGameState.SimulateRound:
-            simulateRoundLogic(roomRef, deltaTime);
-            break;
-        case TanksServerGameState.EndRound:
-            endRoundLogic(roomRef, deltaTime);
-            break;
-        default:
-            logger.error("Unknown Game State - " + getGameState(roomRef, CurrentState));
-            break;
-    }
-}
 
 // Client Request Logic
 // These functions get called by the client in the form of the "customMethod" message set up in the room.
@@ -60,7 +28,7 @@ let gameLoop = function (roomRef: TanksRoom, deltaTime: number){
  * @param client The client the request is coming from
  * @param request The request object from the client that will contain any parameters
  */
-tanksCustomMethods.skipTurn = function(roomRef: TanksRoom, client: Client, request: any) {
+export function skipTurn (roomRef: TanksRoom, client: Client, request: any) {
     
     // Check if the player can do the action
     if(canDoAction(roomRef, client.sessionId) == false) {
@@ -234,7 +202,7 @@ tanksCustomMethods.getFirePath = function(roomRef: TanksRoom, client: Client, re
     roomRef.playerHP.forEach((hp, playerId) => {
         if(hp <= 0) {
             // Player has been destroyed!
-            moveToState(roomRef, TanksServerGameState.EndRound);
+            moveToState(roomRef, GameState.EndRound);
         }
     });
 
@@ -251,22 +219,6 @@ tanksCustomMethods.getFirePath = function(roomRef: TanksRoom, client: Client, re
     }
 }
 
-/**
- * Quits a player from the game and room
- * @param roomRef Reference to the room
- * @param client The client the request is coming from
- * @param request The request object from the client that will contain any parameters
- */
-tanksCustomMethods.quitGame = function(roomRef: TanksRoom, client: Client, request: any) {
-    
-    if(roomRef.players.has(client.sessionId) == false) {
-
-        logger.error(`*** Quit Game - No player for session Id - ${client.sessionId} ***`);
-        return;
-    }
-    
-    roomRef.onPlayerQuit(client);
-}
 //====================================== END Client Request Logic
 
 // GAME LOGIC
@@ -277,7 +229,7 @@ tanksCustomMethods.quitGame = function(roomRef: TanksRoom, client: Client, reque
  * @param sessionId Session Id of the player we want to check for
  * @returns True if it is the player's turn
  */
-let isPlayersTurn = function(roomRef: TanksRoom, sessionId: string): boolean {
+function isPlayersTurn (roomRef: TanksRoom, sessionId: string): boolean {
     let playerNum = roomRef.currentTurnContainer.playerTurn;
 
     let playerTurnId = roomRef.players.get(sessionId);
@@ -291,10 +243,9 @@ let isPlayersTurn = function(roomRef: TanksRoom, sessionId: string): boolean {
  * @param sessionId Session Id of the player we're checking
  * @returns 
  */
-let canDoAction = function(roomRef: TanksRoom, sessionId: string): boolean {
-    
+export function canDoAction (roomRef: TanksRoom, sessionId: string): boolean {
     const notMoving = roomRef.playerMoving == false;
-    const goodGameState = getGameState(roomRef, CurrentState) == TanksServerGameState.SimulateRound;
+    const goodGameState = getGameState(roomRef, CurrentState) == GameState.SimulateRound;
     const goodPlayer = roomRef.players.has(sessionId) && isPlayersTurn(roomRef, sessionId);
 
     return goodGameState && goodPlayer && notMoving;
@@ -305,7 +256,7 @@ let canDoAction = function(roomRef: TanksRoom, sessionId: string): boolean {
  * @param roomRef Reference to the room
  * @param amount The amount of Action Points to consume
  */
-let consumeAP = function(roomRef: TanksRoom, amount: number)
+function consumeAP (roomRef: TanksRoom, amount: number)
 {
     roomRef.currentTurnContainer.updateCurrentAP(-amount);
 }
@@ -318,7 +269,7 @@ let consumeAP = function(roomRef: TanksRoom, amount: number)
  * @param cannonPower The power charge of the tank's cannon
  * @returns An array of Vector3 resembling a projectile's path
  */
-let getFirePath = function(roomRef: TanksRoom, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number) : Vector3[] {
+function getFirePath (roomRef: TanksRoom, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number) : Vector3[] {
 
     let initialVelocity: Vector3 = barrelForward.clone().multiplyScalar(cannonPower);
     let currentVelocity: Vector3 = initialVelocity;
@@ -342,7 +293,7 @@ let getFirePath = function(roomRef: TanksRoom, barrelForward: Vector3, barrelPos
  * @param originalPath The original path that is getting updated
  * @returns An array of Vector3 resembling a projectile's path
  */
-let getHighAccuracyFirePath = function(roomRef: TanksRoom, originalPath: Vector3[]) {
+function getHighAccuracyFirePath (roomRef: TanksRoom, originalPath: Vector3[]) {
     let newPath: Vector3[] = [];
     let previousPos: Vector3 = originalPath[0].clone();
     newPath.push(previousPos.clone());
@@ -368,7 +319,7 @@ let getHighAccuracyFirePath = function(roomRef: TanksRoom, originalPath: Vector3
  * @param client The client for whose turn is ending
  * @param isSkip Are we ending the turn because the player has skipped?
  */
-let endCurrentTurn = function(roomRef:TanksRoom, client: Client, isSkip: boolean = false){
+export function endCurrentTurn (roomRef:TanksRoom, client: Client, isSkip: boolean = false){
 
     if(roomRef.currentTurnContainer == null){
         roomRef.currentTurnContainer = new TurnContainer();
@@ -390,7 +341,7 @@ let endCurrentTurn = function(roomRef:TanksRoom, client: Client, isSkip: boolean
  * @param {*} roomRef Reference to the room
  * @param {*} gameState Key for which game state you want, either the Current game state for the Last game state
  */
-let getGameState = function (roomRef: TanksRoom, gameState: string) : string {
+export function getGameState (roomRef: TanksRoom, gameState: string) : string {
 
     return roomRef.state.attributes.get(gameState);
 }
@@ -399,17 +350,16 @@ let getGameState = function (roomRef: TanksRoom, gameState: string) : string {
  * Checks if players want a rematch if they have a 'readyState' of "ready"
  * @param {*} users The collection of users from the room's state
  */
-let checkForRematch = function(roomRef: TanksRoom, users: Map<string, ColyseusNetworkedUser>) {
+function checkForRematch (roomRef: TanksRoom, users: Map<string, Player>) {
     let playersReady: boolean = true;
-
-    let userArr: ColyseusNetworkedUser[]  = Array.from<ColyseusNetworkedUser>(users.values());
+    let userArr = Array.from(users.values());
 
     if(userArr.length <= 0)
         playersReady = false;
 
     for(let user of userArr) {
         
-        let readyState: string = user.attributes.get(ClientReadyState);
+        let readyState: string = user.readyState;;
         
         if(readyState == null || readyState != "ready"){
             playersReady = false;
@@ -433,112 +383,16 @@ let checkForRematch = function(roomRef: TanksRoom, users: Map<string, ColyseusNe
     return playersReady;
 }
 
-/**
- * Resets data for a new round of play
- * @param roomRef Reference to the room
- */
-let resetForNewRound = function (roomRef: TanksRoom) {
-    
-    // Generate environment
-    roomRef.environmentController.GenerateEnvironment(50, 10); 
-
-    // Reset turn data
-    roomRef.currentTurnContainer.completeReset();
-
-    // Reset weapons
-    roomRef.weaponController.resetWeapons();
-
-    // Reset HP
-    roomRef.playerHP.set(0, GameRules.MaxHitPoints);
-    roomRef.playerHP.set(1, GameRules.MaxHitPoints);
-
-    setUsersAttribute(roomRef, ClientReadyState, "waiting");    
-}
-
-/**
- * Sets attribute of all connected users.
- * @param {*} roomRef Reference to the room
- * @param {*} key The key for the attribute you want to set
- * @param {*} value The value of the attribute you want to set
- */
-let setUsersAttribute = function(roomRef: TanksRoom, key: string, value: string) {
-    
-    for(let entry of Array.from<any>(roomRef.state.networkedUsers)) {
-  
-        let userKey: string = entry[0];
-        let msg: any = {userId: userKey, attributesToSet: {}};
-  
-        msg.attributesToSet[key] = value;
-  
-        roomRef.setAttribute(null, msg);
-    }
-    
-  }
-
   /**
   * Sets attriubte of the room
   * @param {*} roomRef Reference to the room
   * @param {*} key The key for the attribute you want to set
   * @param {*} value The value of the attribute you want to set
   */
-  let setRoomAttribute = function(roomRef: TanksRoom, key: string, value: string) {
+  function setRoomAttribute (roomRef: TanksRoom, key: string, value: string) {
     roomRef.state.attributes.set(key, value);
   }
 
-  /**
-   * Sends the data for an initial setup to the provided client
-   * @param roomRef Reference to the room
-   * @param client The client to send the initial setup data to
-   * @param playerTurnId The turn Id of the client
-   */
-let sendInitialSetup = function(roomRef: TanksRoom, client: Client, playerTurnId: number) {
-    const playerNames: string[] = [];
-
-    const playerHP: number[] = [];
-
-    if(roomRef.metadata.team0){
-        playerNames.push(roomRef.metadata.team0);
-        playerHP.push(roomRef.playerHP.get(0));
-    }
-
-    if(roomRef.metadata.team1) {
-        playerNames.push(roomRef.metadata.team1);
-        playerHP.push(roomRef.playerHP.get(1));
-    }
-
-    const initialSetup = {
-        playerTurnId, 
-        playerTurn: roomRef.currentTurnContainer.playerTurn, 
-        currentPlayerAP: roomRef.currentTurnContainer.currentAP, 
-        currentWeapon: roomRef.weaponController.weapons[0],
-        worldMap: roomRef.environmentController.mapMatrix,
-        playerNames,
-        playerHP,
-        challengerOnline: roomRef.connectedUsers > 1
-    };
-
-    // Send the initial setup data
-    if(client) {
-        client.send("initialSetUp", initialSetup);
-    }
-    else {
-       roomRef.broadcast("initialSetUp", initialSetup);
-    }
-
-    // If a player has quit the game, notify the client with the name
-    if(roomRef.quitPlayers.size > 0) {
-
-        let playerName: string = "";
-
-        roomRef.quitPlayers.forEach((pName, sessionId) => {
-            playerName = pName;
-        });
-
-        // Broadcast a message to any other connected clients about the user quit
-        roomRef.broadcast("onPlayerQuitGame", { playerName });
-    }
-
-}
 //====================================== END GAME LOGIC
 
 // GAME STATE LOGIC
@@ -548,7 +402,7 @@ let sendInitialSetup = function(roomRef: TanksRoom, client: Client, playerTurnId
  * @param roomRef Reference to the room
  * @param {*} newState The new state to move to
  */
-let moveToState = function (roomRef: TanksRoom, newState: string) {
+function moveToState (roomRef: TanksRoom, newState: string) {
 
     // LastState = CurrentState
     setRoomAttribute(roomRef, LastState, getGameState(roomRef, CurrentState));
@@ -562,7 +416,7 @@ let moveToState = function (roomRef: TanksRoom, newState: string) {
  * @param roomRef Reference to the room
  * @param {*} deltaTime Server delta time in seconds
  */
-let simulateRoundLogic = function (roomRef: TanksRoom, deltaTime: number) {
+function simulateRoundLogic (roomRef: TanksRoom, deltaTime: number) {
     
     // Update the counter for player movement
     if(roomRef.playerMoving == true) {
@@ -581,26 +435,7 @@ let simulateRoundLogic = function (roomRef: TanksRoom, deltaTime: number) {
  * @param roomRef Reference to the room
  * @param {*} deltaTime Server delta time in seconds
  */
-let endRoundLogic = function (roomRef:TanksRoom, deltaTime: number) {
-
-    // Check if all the users are ready for a rematch
-    let playersReady = checkForRematch(roomRef, roomRef.state.networkedUsers);
-
-    // Return out if not all of the players are ready yet.
-    if(playersReady == false) { 
-        
-        return;
-    }
-
-    setRoomAttribute(roomRef, GeneralMessage, "");
-
-    resetForNewRound(roomRef);
-
-    // Send the new setup data to all clients with a player turn Id of -1 to represent the beginning of a new round
-    sendInitialSetup(roomRef, null, -1);
-
-    // Begin a new round
-    moveToState(roomRef, TanksServerGameState.SimulateRound);
+function endRoundLogic(roomRef:TanksRoom, deltaTime: number) {
 }
 //====================================== END GAME STATE LOGIC
 
@@ -611,19 +446,7 @@ let endRoundLogic = function (roomRef:TanksRoom, deltaTime: number) {
  * @param {*} roomRef Reference to the room
  * @param {*} options Options of the room from the client when it was created
  */
-exports.InitializeLogic = function (roomRef: TanksRoom, options: any) {
-
-    roomRef.environmentController = new EnvironmentBuilder();
-    roomRef.currentTurnContainer = new TurnContainer();
-    roomRef.players = new Map<string, number>();  
-    roomRef.weaponController = new WeaponController();
-    roomRef.playerHP = new Map<number, number>();
-
-    // Set initial game state to waiting for all clients to be ready
-    setRoomAttribute(roomRef, CurrentState, TanksServerGameState.SimulateRound)
-    setRoomAttribute(roomRef, LastState, TanksServerGameState.None);
-
-    resetForNewRound(roomRef);
+export function InitializeLogic (roomRef: TanksRoom, options: any) {
 }
 
 /**
@@ -631,9 +454,22 @@ exports.InitializeLogic = function (roomRef: TanksRoom, options: any) {
  * @param {*} roomRef Reference to the room
  * @param {*} deltaTime Server delta time in milliseconds
  */
-exports.ProcessLogic = function (roomRef: TanksRoom, deltaTime: number) {
-    
-    gameLoop(roomRef, deltaTime / 1000); // convert milliseconds to seconds
+export function gameLoop (roomRef: TanksRoom, deltaTime: number) {
+    const deltaTimeSeconds = deltaTime / 1000;
+
+    // Update the game state
+    switch (getGameState(roomRef, CurrentState)) {
+        case GameState.SimulateRound:
+            simulateRoundLogic(roomRef, deltaTimeSeconds);
+            break;
+        case GameState.EndRound:
+            endRoundLogic(roomRef, deltaTimeSeconds);
+            break;
+        default:
+            logger.error("Unknown Game State - " + getGameState(roomRef, CurrentState));
+            break;
+    }
+
 }
 
 /**
@@ -642,8 +478,7 @@ exports.ProcessLogic = function (roomRef: TanksRoom, deltaTime: number) {
  * @param {*} client Reference to the client the request came from
  * @param {*} request Request object holding any data from the client
  */ 
-exports.ProcessMethod = function (roomRef: TanksRoom, client: any, request: any) {
-    
+export function ProcessMethod (roomRef: TanksRoom, client: any, request: any) {
     // Check for and run the method if it exists
     if (request.method in tanksCustomMethods && typeof tanksCustomMethods[request.method] === "function") {
         
@@ -653,29 +488,3 @@ exports.ProcessMethod = function (roomRef: TanksRoom, client: any, request: any)
         return; 
     }
 }
-
-/**
- * Process a user joinging the room
- * @param {*} roomRef Reference to the room
- * @param {*} client Reference to the client the request came from
- * @param {*} options Any options for the user
- */
-exports.ProcessUserJoined = function (roomRef: TanksRoom, client: Client, options: any){
-
-    const playerTurnId = roomRef.players.get(client.sessionId);
-    let playerName: string = "";
-
-    if(playerTurnId == 0) {
-        playerName = roomRef.metadata.team0;
-    }
-    else {
-        playerName = roomRef.metadata.team1;
-    }
-
-    // Send this client the current data
-    sendInitialSetup(roomRef, client, playerTurnId);
-
-    // Let other client know that another player has joined
-    roomRef.broadcast("playerJoined", { playerName, playerId: playerTurnId }, { except: client });
-}
-//====================================== END VME Room accessed functions

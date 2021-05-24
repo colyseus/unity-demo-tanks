@@ -3,7 +3,7 @@ import { GameRules } from "./gameRules";
 export class TurnContainer {
     private _turnNumber: number; // Tracker for the total number of turns in this game
     private _currentMovement: number; // Tracker for the number of times a player has moved this turn
-    private _currentAP: number; // Tracker for the remaining AP the current player has
+    private _currentAP: number; // Tracker for the remaining AP the current player has ACTION POINT
 
     public get turnNumber(): number {
         return this._turnNumber;

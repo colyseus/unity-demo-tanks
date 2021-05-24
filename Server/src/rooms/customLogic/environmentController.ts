@@ -1,13 +1,11 @@
-const logger = require("../../helpers/logger");
-const utilities = require("../../helpers/LSUtilities");
-const fastNoise = require("fastnoisejs");
 import { Vector2, Vector3 } from "three";
+const fastNoise = require("fastnoisejs");
 
-const MapIconValues = {
-    EMPTY: 0,
-    GROUND: 1,
-    PLAYER_1: 2,
-    PLAYER_2: 3
+export enum MapIconValues {
+    EMPTY = 0,
+    GROUND,
+    PLAYER_1,
+    PLAYER_2
 }
 
 export class EnvironmentBuilder
@@ -26,7 +24,7 @@ export class EnvironmentBuilder
 
         this.mapMatrix = new Array();
 
-        let randomSeed: number = utilities.getRandomFloatInclusive(0, 50);
+        let randomSeed: number = Math.random() * 50;
         let variation: number = 1.5;
         let noise = fastNoise.Create();
         noise.SetNoiseType(fastNoise.Perlin);
@@ -127,7 +125,7 @@ export class EnvironmentBuilder
             if(foundTermination)
                 break;
             
-            //logger.info(`*** Orig Path ${i} - (${origPath[i].x}, ${origPath[i].y})`);
+            //console.log(`*** Orig Path ${i} - (${origPath[i].x}, ${origPath[i].y})`);
 
             let coords: Vector2 = this.ClientPositionToMapCoordinates(origPath[i]);
             if (coords == null)
@@ -157,7 +155,7 @@ export class EnvironmentBuilder
                 }
                 catch (err)
                 {
-                    logger.error(`Error getting map coordinate: ${coords.x}, ${coords.y} - Orig Path: ${origPath[i].x}, ${origPath[i].y}`);
+                    console.error(`Error getting map coordinate: ${coords.x}, ${coords.y} - Orig Path: ${origPath[i].x}, ${origPath[i].y}`);
                     throw `Error getting map coordinate: ${coords.x}, ${coords.y}`;
                 }
                 
@@ -285,7 +283,7 @@ export class EnvironmentBuilder
         let coords: Vector2 = this.localPositionToMapCoordinates(localPosition);
         if (coords == null)
         {
-            logger.error("Explosion did not take place within the map matrix!");
+            console.error("Explosion did not take place within the map matrix!");
             return null;
         }
 

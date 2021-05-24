@@ -1,13 +1,13 @@
-const GameRules = {
-    MovementAPCost : 1,
-    FiringAPCost :  2,
-    MaxAP : 3,
-    MaxMovement : 3,
+export const GameRules = {
+    MovementAPCost: 1,
+    FiringAPCost: 2,
+    MaxAP: 3,
+    MaxMovement: 3,
     MaxHitPoints: 3,
     MovementTime: 2
 }
 
-const WeaponData = [
+export const weaponList = [
     {
         name: "Short Range",
         maxCharge: 5,
@@ -30,5 +30,3 @@ const WeaponData = [
         impactDamage: 1
     }
 ]
-
-export { GameRules, WeaponData }
