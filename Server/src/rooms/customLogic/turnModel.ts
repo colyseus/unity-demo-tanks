@@ -35,7 +35,7 @@ export class TurnContainer {
 
     public resetActions() {
         this._currentMovement = 0;
-        this._currentAP = GameRules.MaxAP;
+        this._currentAP = GameRules.MaxActionPoints;
     }
 
     public completeReset() {

@@ -1,5 +1,12 @@
 import { Vector2, Vector3 } from "three";
+import { TanksState } from "../schema/TanksState";
+
 const fastNoise = require("fastnoisejs");
+
+interface Vector2Like {
+    x: number;
+    y: number;
+}
 
 export enum MapIconValues {
     EMPTY = 0,
@@ -10,6 +17,8 @@ export enum MapIconValues {
 
 export class EnvironmentBuilder
 {
+    state: TanksState;
+
     mapMatrix: Array<Array<number>>; // 2D array to represent the terrain
     playerCoordinates: Map<number, Vector2>; // Collection to track the current coordinates for a player in the mapMatrix
     mapWidth: number;
@@ -83,20 +92,6 @@ export class EnvironmentBuilder
     }
 
     //=======================================================================================================
-    public MovePlayer(player: number, direction: number): boolean {
-
-        let startPos: Vector2 = this.GetPlayerPosition(player);
-        
-        let endPos: Vector2 = this.GetAvailableSpace(direction, startPos);
-        let moved: boolean = startPos.x != endPos.x;
-
-        if(moved)
-        {
-            this.SetPlayerPosition(player, endPos);
-        }
-
-        return moved;
-    }
 
     public GetPlayerPosition(player:number): Vector2 {
         return this.playerCoordinates.get(player);
@@ -194,10 +189,10 @@ export class EnvironmentBuilder
         return value;
     }
 
-    public GetAvailableSpace(direction: number, startPosition: Vector2): Vector2 {
-        let newX: number = startPosition.x;
+    public GetAvailableSpace(direction: number, startPosition: Vector2Like): Vector2Like {
+        let newX: number = startPosition.x + direction;
         let newY: number = startPosition.y;
-        newX += direction;
+
         if (newX < 0 || newX >= this.mapMatrix.length)
         {
             //Cant go off the right or left of the map, do nothing?
@@ -247,13 +242,14 @@ export class EnvironmentBuilder
             return startPosition;
         }
 
-        return new Vector2(newX, newY);
+        return { x: newX, y: newY };
     }
 
     //Get the next grid Y coordinate we can have a tank at
     private FindNextSafeGridPos(startX: number, startY: number) : number {
         let groundFound: boolean = false;
         let yVal: number = Math.max(startY - 1, 0);
+
         while(!groundFound)
         {
             let mapVal = this.mapMatrix[startX][yVal];
@@ -275,6 +271,7 @@ export class EnvironmentBuilder
                 groundFound = true;
             }
         }
+
         return startY;
     }
 

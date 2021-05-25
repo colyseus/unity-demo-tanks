@@ -6,7 +6,7 @@ import { TurnContainer } from "./turnModel";
 import { Vector2, Vector3 } from "three";
 
 import { GameRules } from "./gameRules";
-import { Player, PlayerReadyState } from "../schema/TanksState";
+import { Player, PlayerReadyState } from "../schema/Player";
 
 const logger = require("../../helpers/logger.js");
 
@@ -114,17 +114,21 @@ tanksCustomMethods.movePlayer = function(roomRef: TanksRoom, client: Client, req
     let direction: number = param[0]; // the direction left/right the player desires to move
     let playerNum = roomRef.currentTurnContainer.playerTurn;
 
-    roomRef.playerMoving = true; // Update the player moving flag to true
+    roomRef.isPlayerMoving = true; // Update the player moving flag to true
 
     // Attempt to move the player
     if(roomRef.environmentController.MovePlayer(playerNum, direction)){
 
         // Consume AP
-        consumeAP(roomRef, GameRules.MovementAPCost);
+        consumeAP(roomRef, GameRules.MovementActionPointCost);
 
         //This player moved successfully, let them know!
         let playerPos: Vector2 = roomRef.environmentController.GetPlayerPosition(playerNum);
-        roomRef.broadcast("tankMoved", {playerNumber: playerNum, newCoords: playerPos, remainingAP: roomRef.currentTurnContainer.currentAP});
+        roomRef.broadcast("tankMoved", {
+            playerNumber: playerNum,
+             newCoords: playerPos,
+              remainingAP: roomRef.currentTurnContainer.currentAP
+        });
 
         // Check if the player has used up all their Action Points and end their turn if they have
         if (roomRef.currentTurnContainer.currentAP <= 0)
@@ -152,7 +156,7 @@ tanksCustomMethods.getFirePath = function(roomRef: TanksRoom, client: Client, re
     }
 
     // Check if the user has enough AP to fire
-    if(GameRules.FiringAPCost > roomRef.currentTurnContainer.currentAP) {
+    if(GameRules.FiringActionPointCost > roomRef.currentTurnContainer.currentAP) {
         return;
     }
 
@@ -207,7 +211,7 @@ tanksCustomMethods.getFirePath = function(roomRef: TanksRoom, client: Client, re
     });
 
     // Consume AP for firing weapon
-    consumeAP(roomRef, GameRules.FiringAPCost);
+    consumeAP(roomRef, GameRules.FiringActionPointCost);
 
     roomRef.broadcast("receiveFirePath", { firePath, remainingAP: roomRef.currentTurnContainer.currentAP, playerNumber: playerNum, damageData,  });
 
@@ -244,7 +248,7 @@ function isPlayersTurn (roomRef: TanksRoom, sessionId: string): boolean {
  * @returns 
  */
 export function canDoAction (roomRef: TanksRoom, sessionId: string): boolean {
-    const notMoving = roomRef.playerMoving == false;
+    const notMoving = roomRef.isPlayerMoving == false;
     const goodGameState = getGameState(roomRef, CurrentState) == GameState.SimulateRound;
     const goodPlayer = roomRef.players.has(sessionId) && isPlayersTurn(roomRef, sessionId);
 
@@ -346,42 +350,6 @@ export function getGameState (roomRef: TanksRoom, gameState: string) : string {
     return roomRef.state.attributes.get(gameState);
 }
  
-/**
- * Checks if players want a rematch if they have a 'readyState' of "ready"
- * @param {*} users The collection of users from the room's state
- */
-function checkForRematch (roomRef: TanksRoom, users: Map<string, Player>) {
-    let playersReady: boolean = true;
-    let userArr = Array.from(users.values());
-
-    if(userArr.length <= 0)
-        playersReady = false;
-
-    for(let user of userArr) {
-        
-        let readyState: string = user.readyState;;
-        
-        if(readyState == null || readyState != "ready"){
-            playersReady = false;
-        }
-        else {
-            
-            let playerId: number = roomRef.players.get(user.sessionId);
-
-            let playerName = "Player";
-            if(playerId == 0) {
-                playerName = roomRef.metadata.team0;
-            }
-            else {
-                playerName = roomRef.metadata.team1;
-            }
-
-            setRoomAttribute(roomRef, GeneralMessage, `${playerName} wants a rematch!`);
-        }
-    }
-
-    return playersReady;
-}
 
   /**
   * Sets attriubte of the room
@@ -419,11 +387,11 @@ function moveToState (roomRef: TanksRoom, newState: string) {
 function simulateRoundLogic (roomRef: TanksRoom, deltaTime: number) {
     
     // Update the counter for player movement
-    if(roomRef.playerMoving == true) {
+    if(roomRef.isPlayerMoving == true) {
         roomRef.currPlayerMoveWait += deltaTime;
 
         if(roomRef.currPlayerMoveWait >= GameRules.MovementTime) {
-            roomRef.playerMoving = false;
+            roomRef.isPlayerMoving = false;
             roomRef.currPlayerMoveWait = 0;
         }
     }

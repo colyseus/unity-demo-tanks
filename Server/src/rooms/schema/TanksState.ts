@@ -1,10 +1,7 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
-import { weaponList } from "../customLogic/gameRules";
-
-export enum PlayerReadyState {
-    WAITING = "waiting",
-    READY = "ready",
-}
+import { GameRules, weaponList } from "../customLogic/gameRules";
+import { Player } from "./Player";
+import { Weapon } from "./Weapon";
 
 export enum GameState {
     None = "None",
@@ -12,27 +9,6 @@ export enum GameState {
     BeginRound = "BeginRound",
     SimulateRound = "SimulateRound",
     EndRound = "EndRound"
-}
-
-export class Player extends Schema {
-    @type("string") sessionId: string;
-    @type("string") readyState: PlayerReadyState; 
-
-    @type("number") teamId: number;
-    @type("string") name: string;
-    @type("number") hp: number;
-    @type("number") currentWeapon: number = 0;
-
-    @type("number") timestamp: number;
-    @type("boolean") connected: boolean;
-}
-
-export class Weapon extends Schema {
-    @type("string") name: string;
-    @type("number") maxCharge: number;
-    @type("number") chargeTime: number;
-    @type("number") radius: number;
-    @type("number") impactDamage: number;
 }
 
 export class TanksState extends Schema {
@@ -43,8 +19,12 @@ export class TanksState extends Schema {
     @type("string") gameState: GameState;
     @type("string") previousGameState: GameState;
 
-    @type("number") currentTurn: number;
+    @type("number") currentTurn: number; // either 0 or 1
+    @type("number") turnNumber: number = 0; // incremental from 0 to X
+
     @type("string") statusMessage: string;
+
+    isPlayerMoving: boolean = false;
 
     constructor() {
         super();
@@ -57,6 +37,15 @@ export class TanksState extends Schema {
             // push weapon to weapons array
             this.weapons.push(weapon);
         }
+    }
+
+    /**
+     * Go to next turn.
+     */
+    nextTurn() {
+        this.turnNumber++;
+        // reset player actions
+        this.players.forEach((player) => player.resetActions());
     }
 
     /**
@@ -77,5 +66,40 @@ export class TanksState extends Schema {
         ) {
             player.currentWeapon = weaponIndex;
         }
+    }
+
+    getFirePath(roomRef: TanksRoom, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector3[] {
+        let initialVelocity: Vector3 = barrelForward.clone().multiplyScalar(cannonPower);
+        let currentVelocity: Vector3 = initialVelocity;
+        let currPos: Vector3 = barrelPosition.clone();
+        let pathSteps: Vector3[] = [];
+        pathSteps.push(currPos.clone());
+        const grav: number = -0.98;
+        while (currPos.y > -1.0) {
+            currentVelocity.y += grav;
+            currPos.add(currentVelocity);
+            pathSteps.push(currPos.clone());
+        }
+
+        return this.getHighAccuracyFirePath(roomRef, pathSteps);
+    }
+
+    getHighAccuracyFirePath(roomRef: TanksRoom, originalPath: Vector3[]) {
+        let newPath: Vector3[] = [];
+        let previousPos: Vector3 = originalPath[0].clone();
+
+        newPath.push(previousPos.clone());
+        for (let i = 1; i < originalPath.length; ++i) {
+            let currPathSeg = originalPath[i].clone();
+            let dist: number = Math.floor(previousPos.distanceTo(currPathSeg)) * 2;
+            let stepSize: Vector3 = new Vector3().subVectors(currPathSeg, previousPos).divideScalar(dist);
+
+            for (let j = 0; j < dist; ++j) {
+                previousPos.add(stepSize);
+                newPath.push(previousPos.clone());
+            }
+        }
+
+        return roomRef.environmentController.TrimFirePathToEnvironment(newPath);
     }
 }

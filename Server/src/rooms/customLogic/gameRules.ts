@@ -1,10 +1,11 @@
 export const GameRules = {
-    MovementAPCost: 1,
-    FiringAPCost: 2,
-    MaxAP: 3,
+    MaxActionPoints: 3,
+    MovementActionPointCost: 1,
+    FiringActionPointCost: 2,
+
     MaxMovement: 3,
     MaxHitPoints: 3,
-    MovementTime: 2
+    MovementTime: 2,
 }
 
 export const weaponList = [
