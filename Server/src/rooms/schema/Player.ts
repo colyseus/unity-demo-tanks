@@ -11,7 +11,7 @@ export class Player extends Schema {
     @type("string") sessionId: string;
     @type("string") readyState: PlayerReadyState;
 
-    @type("number") teamId: number;
+    @type("number") playerId: number;
     @type("string") name: string;
 
     // in-game properties

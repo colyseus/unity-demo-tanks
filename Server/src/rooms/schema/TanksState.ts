@@ -1,6 +1,6 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { GameRules, weaponList } from "../customLogic/gameRules";
-import { Player } from "./Player";
+import { Player, PlayerReadyState } from "./Player";
 import { Weapon } from "./Weapon";
 
 export enum GameState {
@@ -37,6 +37,18 @@ export class TanksState extends Schema {
             // push weapon to weapons array
             this.weapons.push(weapon);
         }
+
+        this.restart();
+    }
+
+    restart() {
+        // Reset players
+        this.players.forEach((player) => {
+            player.hp = GameRules.MaxHitPoints;
+            player.readyState = PlayerReadyState.WAITING;
+            player.currentWeapon = 0;
+            player.resetActions();
+        });
     }
 
     /**
@@ -44,8 +56,15 @@ export class TanksState extends Schema {
      */
     nextTurn() {
         this.turnNumber++;
+
         // reset player actions
         this.players.forEach((player) => player.resetActions());
+    }
+
+    getPlayerByPlayerId(playerId: number) {
+        return Array
+            .from(this.players.values())
+            .find((player) => player.playerId === playerId);
     }
 
     /**
@@ -66,6 +85,11 @@ export class TanksState extends Schema {
         ) {
             player.currentWeapon = weaponIndex;
         }
+    }
+
+    getActiveWeapon(sessionId: string) {
+        const player = this.players.get(sessionId);
+        return this.weapons[player.currentWeapon] || this.weapons[0]; // fallback to weapons[0] 
     }
 
     getFirePath(roomRef: TanksRoom, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector3[] {

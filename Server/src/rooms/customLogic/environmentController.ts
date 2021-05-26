@@ -17,12 +17,11 @@ export enum MapIconValues {
 
 export class EnvironmentBuilder
 {
-    state: TanksState;
-
     mapMatrix: Array<Array<number>>; // 2D array to represent the terrain
-    playerCoordinates: Map<number, Vector2>; // Collection to track the current coordinates for a player in the mapMatrix
     mapWidth: number;
     mapHeight: number;
+
+    constructor (private state: TanksState) {}
 
     //Map Generation code
     //=======================================================================================================
@@ -64,7 +63,6 @@ export class EnvironmentBuilder
 
         let oneX: number = 5;
         let twoX: number = this.mapMatrix.length - 5;
-        this.playerCoordinates = new Map<number, Vector2>();
         for (let y = 0; y < height; ++y)
         {
             if (this.mapMatrix[oneX][y] == MapIconValues.EMPTY && !playerOnePlaced)
@@ -93,22 +91,24 @@ export class EnvironmentBuilder
 
     //=======================================================================================================
 
-    public GetPlayerPosition(player:number): Vector2 {
-        return this.playerCoordinates.get(player);
+    public GetPlayerPosition(playerNum:number): Vector2Like {
+        return this.state.getPlayerByPlayerId(playerNum).coords;
     }
 
-    public SetPlayerPosition(player: number, coords: Vector2) {
-        
-        const previousPos: Vector2 = this.GetPlayerPosition(player);
+    public SetPlayerPosition(playerNum: number, coords: Vector2) {
+        const player = this.state.getPlayerByPlayerId(playerNum);
+        const previousPos = this.GetPlayerPosition(playerNum);
 
-        if(previousPos) {
+        if (previousPos) {
             this.mapMatrix[previousPos.x][previousPos.y] = MapIconValues.EMPTY;
         }
 
-        this.playerCoordinates.set(player, coords);
+        player.coords.assign(coords);
 
         // Update the matrix
-        this.mapMatrix[coords.x][coords.y] = player == 0 ? MapIconValues.PLAYER_1 : MapIconValues.PLAYER_2; 
+        this.mapMatrix[coords.x][coords.y] = (playerNum == 0)
+            ? MapIconValues.PLAYER_1
+            : MapIconValues.PLAYER_2;
     }
 
     public TrimFirePathToEnvironment(origPath: Vector3[]): Vector3[] {
@@ -275,16 +275,15 @@ export class EnvironmentBuilder
         return startY;
     }
 
-    public dealDamage(localPosition: Vector3, radius: number, damage: number): any
-    {
+    public dealDamage(localPosition: Vector3, radius: number, damage: number) {
         let coords: Vector2 = this.localPositionToMapCoordinates(localPosition);
         if (coords == null)
         {
             console.error("Explosion did not take place within the map matrix!");
-            return null;
+            return;
         }
 
-        const updatedPlayersMap: Map<number, any> = new Map<number, any>();
+        const updatedPlayersMap = new Map<number, {playerId: number, damage: number}> ();
 
         let impactedCoordinates: Vector2[] = this.getImpactedCoordinatesList(coords, radius);
         for (let i: number = 0; i < impactedCoordinates.length; ++i)
@@ -307,9 +306,9 @@ export class EnvironmentBuilder
                 this.SetPlayerPosition(updatedPlayersPositions[i].playerId, updatedPlayersPositions[i].playerPos);
 
                 if(updatedPlayersMap.has(updatedPlayersPositions[i].playerId)) {
-                    let playerObj = updatedPlayersMap.get(updatedPlayersPositions[i].playerId);
+                    // let playerObj = updatedPlayersMap.get(updatedPlayersPositions[i].playerId);
 
-                    playerObj.playerPos = updatedPlayersPositions[i].playerPos;
+                    // playerObj.playerPos = updatedPlayersPositions[i].playerPos;
                 }
                 else {
                     updatedPlayersMap.set(updatedPlayersPositions[i].playerId, { playerId: updatedPlayersPositions[i].playerId, playerPos: updatedPlayersPositions[i].playerPos });

@@ -35,6 +35,8 @@ export class TanksRoom extends Room<TanksState> {
             previousGameState: GameState.None,
         }));
 
+        this.environmentController = new EnvironmentBuilder(this.state);
+
         this.resetForNewRound();
 
         // Set the callback for the "ping" message for tracking server-client latency
@@ -100,65 +102,55 @@ export class TanksRoom extends Room<TanksState> {
             // skip if the user does not have enough Action Points to fire
             if (player.currentActionPoints <= GameRules.FiringActionPointCost) { return; }
 
-            //0 - player number 0 = 1, 1 = 2
-            //1 - moveDirection
-            const param = request.param;
+            // validate message input
+            const forward = message.forward;
+            const position = message.position;
+            const power = message.power;
 
             // 0 = barrel forward | 1 = barrel position | 2 = cannon power
-            if (param == null || param.length < 3) {
+            if (forward === undefined || position === undefined || typeof(power) !== "number") {
                 throw "Error - Get Fire Path - Missing parameter";
                 return;
             }
 
-            const playerNum = this.currentTurnContainer.playerTurn;
-
             // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
-            let firePath: Vector3[] = getFirePath(this, new Vector3(Number(param[0].x), Number(param[0].y), Number(param[0].z)), new Vector3(Number(param[1].x), Number(param[1].y), Number(param[1].z)), Number(param[2]));
+            let firePath: Vector3[] = this.state.getFirePath(
+                this,
+                new Vector3(forward.x, forward.y, forward.z),
+                new Vector3(position.x, position.y, position.z),
+                power
+            );
 
             // Get the player's currently active weapon
-            const activeWeapon: Weapon = this.weaponController.getPlayerActiveWeapon(playerNum);
+            const activeWeapon = this.state.getActiveWeapon(client.sessionId);
 
             // Send the path to the environment controller to check if any damage is done to terrain or player
-            let damageData: any = this.environmentController.dealDamage(firePath[firePath.length - 1], activeWeapon.radius, activeWeapon.impactDamage);
+            const damageData = this.environmentController.dealDamage(
+                firePath[firePath.length - 1],
+                activeWeapon.radius,
+                activeWeapon.impactDamage
+            );
 
             if (damageData) {
-                let updatedPlayers: any[] = damageData.updatedPlayers;
+                damageData.updatedPlayers.forEach((updatedPlayer) => {
+                    const player = this.state.getPlayerByPlayerId(updatedPlayer.playerId);
 
-                // Update player hit points
-                if (updatedPlayers) {
-                    for (let i = 0; i < updatedPlayers.length; i++) {
-                        let playerId = updatedPlayers[i].playerId;
-                        if (this.playerHP.has(playerId)) {
-                            // Update player HP if there is damage
-                            if (updatedPlayers[i].damage) {
-                                let currentHP = this.playerHP.get(playerId);
-                                this.playerHP.set(playerId, currentHP - updatedPlayers[i].damage);
-                            }
-
-                            updatedPlayers[i].remainingHP = this.playerHP.get(playerId);
-                        }
+                    // Update player HP if there is damage
+                    if (updatedPlayer.damage) {
+                        player.hp -= updatedPlayer.damage;
                     }
-                }
 
+                    if (player.hp <= 0) {
+                        this.state.moveToState(GameState.EndRound);
+                    }
+                });
             }
-
-            // Check player hit points
-            this.playerHP.forEach((hp, playerId) => {
-                if (hp <= 0) {
-                    // Player has been destroyed!
-                    moveToState(this, GameState.EndRound);
-                }
-            });
 
             // Consume AP for firing weapon
             player.consumeActionPoints(GameRules.FiringActionPointCost);
 
-            this.broadcast("receiveFirePath", {
-                firePath,
-                remainingAP: this.currentTurnContainer.currentAP,
-                playerNumber: playerNum,
-                damageData,
-            });
+            // TODO: is `damageData` required to be sent here??
+            this.broadcast("receiveFirePath", { firePath, damageData });
 
             // Check if the player has used up all their Action Points and end their turn if they have
             if (player.currentActionPoints <= 0) {
@@ -185,7 +177,7 @@ export class TanksRoom extends Room<TanksState> {
         const newPlayer = new Player().assign({
             sessionId: client.sessionId,
             name: options.displayName,
-            teamId: (isCreator) ? 0 : 1,
+            playerId: (isCreator) ? 0 : 1,
         });
 
         // Set player instance to be synchronized
@@ -193,7 +185,7 @@ export class TanksRoom extends Room<TanksState> {
 
         // Set team0 / team1 key on room's metadata
         this.setMetadata({
-            [`team${newPlayer.teamId}`]: client.sessionId
+            [`team${newPlayer.playerId}`]: client.sessionId
         });
     }
 
@@ -225,9 +217,7 @@ export class TanksRoom extends Room<TanksState> {
                 let playersReady = this.checkForRematch();
 
                 // Return out if not all of the players are ready yet.
-                if (playersReady == false) {
-                    return;
-                }
+                if (playersReady === false) { return; }
 
                 this.state.statusMessage = "";
 
@@ -253,14 +243,7 @@ export class TanksRoom extends Room<TanksState> {
         this.environmentController.GenerateEnvironment(50, 10);
 
         // Reset turn data
-        this.currentTurnContainer.completeReset();
-
-        // Reset players
-        this.state.players.forEach((player) => {
-            player.hp = GameRules.MaxHitPoints;
-            player.readyState = PlayerReadyState.WAITING;
-            player.currentWeapon = 0;
-        });
+        this.state.restart();
     }
 
     /**
@@ -282,7 +265,7 @@ export class TanksRoom extends Room<TanksState> {
      */
     private isPlayersTurn(sessionId: string): boolean {
         let playerNum = this.state.currentTurn;
-        let playerTurnId = this.state.players.get(sessionId).teamId;
+        let playerTurnId = this.state.players.get(sessionId).playerId;
         return playerNum == playerTurnId;
     }
 
@@ -338,7 +321,7 @@ export class TanksRoom extends Room<TanksState> {
         leavingPlayer.connected = false;
 
         this.setMetadata({
-            [`team${leavingPlayer.teamId}`]: `${leavingPlayer.name} (Surrendered)`
+            [`team${leavingPlayer.playerId}`]: `${leavingPlayer.name} (Surrendered)`
         });
     }
 
