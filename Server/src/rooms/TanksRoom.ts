@@ -44,6 +44,14 @@ export class TanksRoom extends Room<TanksState> {
             client.send(0, { serverTime: this.serverTime });
         });
 
+        // Set player as "ready"
+        this.onMessage("ready", (client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (player) {
+                player.readyState = PlayerReadyState.READY;
+            }
+        });
+
         this.onMessage("skipTurn", (client, message) => {
             // Check if the player can do the action
             if (this.canDoAction(client.sessionId) == false) {
@@ -273,40 +281,16 @@ export class TanksRoom extends Room<TanksState> {
      * Checks if players want a rematch if they have a 'readyState' of "ready"
      */
     private checkForRematch() {
-        const players = Array.from(this.state.players.values())
-        const playersReady = players.filter((player) => player.readyState === PlayerReadyState.READY);
+        let numPlayersReady: number = 0;
 
         this.state.players.forEach((player) => {
-
+            if (player.readyState === PlayerReadyState.READY) {
+                this.state.statusMessage = `${player.name} wants a rematch!`;
+                numPlayersReady++;
+            }
         });
 
-        if (userArr.length <= 0)
-            playersReady = false;
-
-        for (let user of userArr) {
-
-            let readyState: string = user.readyState;;
-
-            if (readyState == null || readyState != "ready") {
-                playersReady = false;
-            }
-            else {
-
-                let playerId: number = this.players.get(user.sessionId);
-
-                let playerName = "Player";
-                if (playerId == 0) {
-                    playerName = this.metadata.team0;
-                }
-                else {
-                    playerName = this.metadata.team1;
-                }
-
-                setRoomAttribute(this, GeneralMessage, `${playerName} wants a rematch!`);
-            }
-        }
-
-        return (playersReady.length === 2);
+        return (numPlayersReady === 2);
     }
 
     // Callback when a client has left the room

@@ -42,6 +42,8 @@ export class TanksState extends Schema {
     }
 
     restart() {
+        // TODO: generate environment
+
         // Reset players
         this.players.forEach((player) => {
             player.hp = GameRules.MaxHitPoints;
