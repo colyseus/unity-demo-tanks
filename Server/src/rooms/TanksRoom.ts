@@ -1,10 +1,9 @@
-import { Room, Client, generateId } from "colyseus";
+import { Room, Client } from "colyseus";
 import { TanksState, GameState } from "./schema/TanksState";
 import { Player, PlayerReadyState } from "./schema/Player";
-import { EnvironmentBuilder } from "./customLogic/EnvironmentController";
-import { GameRules } from "./customLogic/gameRules";
-import { Vector2, Vector3 } from "three";
-import * as tanks from "./customLogic/tanks";
+import { EnvironmentBuilder } from "./tanks/EnvironmentController";
+import { GameRules } from "./tanks/rules";
+import { Vector3 } from "three";
 
 export class TanksRoom extends Room<TanksState> {
     
@@ -111,22 +110,21 @@ export class TanksRoom extends Room<TanksState> {
             if (player.currentActionPoints <= GameRules.FiringActionPointCost) { return; }
 
             // validate message input
-            const forward = message.forward;
-            const position = message.position;
-            const power = message.power;
+            const barrelForward = message.barrelForward;
+            const barrelPosition = message.barrelPosition;
+            const cannonPower = message.cannonPower;
 
             // 0 = barrel forward | 1 = barrel position | 2 = cannon power
-            if (forward === undefined || position === undefined || typeof(power) !== "number") {
+            if (barrelForward === undefined || barrelPosition === undefined || typeof(cannonPower) !== "number") {
                 throw "Error - Get Fire Path - Missing parameter";
-                return;
             }
 
             // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
             let firePath: Vector3[] = this.state.getFirePath(
-                this,
-                new Vector3(forward.x, forward.y, forward.z),
-                new Vector3(position.x, position.y, position.z),
-                power
+                this.environmentController,
+                new Vector3(barrelForward.x, barrelForward.y, barrelForward.z),
+                new Vector3(barrelPosition.x, barrelPosition.y, barrelPosition.z),
+                cannonPower
             );
 
             // Get the player's currently active weapon

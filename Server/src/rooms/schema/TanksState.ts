@@ -1,7 +1,11 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
-import { GameRules, weaponList } from "../customLogic/gameRules";
+import { Vector3 } from "three";
+import { EnvironmentBuilder } from "../tanks/EnvironmentController";
+
+import { GameRules, weaponList } from "../tanks/rules";
 import { Player, PlayerReadyState } from "./Player";
 import { Weapon } from "./Weapon";
+import { World } from "./World";
 
 export enum GameState {
     None = "None",
@@ -13,8 +17,8 @@ export enum GameState {
 
 export class TanksState extends Schema {
     @type({ map: Player }) players = new MapSchema<Player>();
-    @type(["number"]) worldMap = new ArraySchema<number>();
     @type([Weapon]) weapons = new ArraySchema<Weapon>();
+    @type(World) world = new World();
 
     @type("string") gameState: GameState;
     @type("string") previousGameState: GameState;
@@ -94,7 +98,8 @@ export class TanksState extends Schema {
         return this.weapons[player.currentWeapon] || this.weapons[0]; // fallback to weapons[0] 
     }
 
-    getFirePath(roomRef: TanksRoom, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector3[] {
+    // FIXME: this method could be extracted inside Environment class
+    getFirePath(environment: EnvironmentBuilder, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector3[] {
         let initialVelocity: Vector3 = barrelForward.clone().multiplyScalar(cannonPower);
         let currentVelocity: Vector3 = initialVelocity;
         let currPos: Vector3 = barrelPosition.clone();
@@ -107,10 +112,11 @@ export class TanksState extends Schema {
             pathSteps.push(currPos.clone());
         }
 
-        return this.getHighAccuracyFirePath(roomRef, pathSteps);
+        return this.getHighAccuracyFirePath(environment, pathSteps);
     }
 
-    getHighAccuracyFirePath(roomRef: TanksRoom, originalPath: Vector3[]) {
+    // FIXME: this method could be extracted inside Environment class
+    getHighAccuracyFirePath(environment: EnvironmentBuilder, originalPath: Vector3[]) {
         let newPath: Vector3[] = [];
         let previousPos: Vector3 = originalPath[0].clone();
 
@@ -126,6 +132,6 @@ export class TanksState extends Schema {
             }
         }
 
-        return roomRef.environmentController.TrimFirePathToEnvironment(newPath);
+        return environment.TrimFirePathToEnvironment(newPath);
     }
 }

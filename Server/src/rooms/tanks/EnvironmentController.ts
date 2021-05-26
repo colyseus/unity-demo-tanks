@@ -17,18 +17,15 @@ export enum MapIconValues {
 
 export class EnvironmentBuilder
 {
-    mapMatrix: Array<Array<number>>; // 2D array to represent the terrain
-    mapWidth: number;
-    mapHeight: number;
+    mapMatrix: number[][]; // 2D array to represent the terrain
 
     constructor (private state: TanksState) {}
 
     //Map Generation code
     //=======================================================================================================
     public GenerateEnvironment(width: number, height: number){
-
-        this.mapWidth = width;
-        this.mapHeight = height;
+        this.state.world.width = width;
+        this.state.world.height = height;
 
         this.mapMatrix = new Array();
 
@@ -56,6 +53,10 @@ export class EnvironmentBuilder
 
         this.SetPlayerSpawns(height);
     }
+
+    // Alias for world width/height
+    get mapWidth () { return this.state.world.width; }
+    get mapHeight () { return this.state.world.height; }
 
     private SetPlayerSpawns(height: number){
         let playerOnePlaced: boolean = false;
@@ -283,7 +284,7 @@ export class EnvironmentBuilder
             return;
         }
 
-        const updatedPlayersMap = new Map<number, {playerId: number, damage: number}> ();
+        const updatedPlayersMap = new Map<number, { playerId: number, damage?: number }>();
 
         let impactedCoordinates: Vector2[] = this.getImpactedCoordinatesList(coords, radius);
         for (let i: number = 0; i < impactedCoordinates.length; ++i)
@@ -311,7 +312,10 @@ export class EnvironmentBuilder
                     // playerObj.playerPos = updatedPlayersPositions[i].playerPos;
                 }
                 else {
-                    updatedPlayersMap.set(updatedPlayersPositions[i].playerId, { playerId: updatedPlayersPositions[i].playerId, playerPos: updatedPlayersPositions[i].playerPos });
+                    updatedPlayersMap.set(updatedPlayersPositions[i].playerId, {
+                        playerId: updatedPlayersPositions[i].playerId,
+                        //  playerPos: updatedPlayersPositions[i].playerPos
+                    });
                 }
             }
         }
