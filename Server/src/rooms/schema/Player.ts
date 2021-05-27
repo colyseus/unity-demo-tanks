@@ -1,5 +1,5 @@
 import { Schema, type } from "@colyseus/schema";
-import { GameRules } from "../customLogic/gameRules";
+import { GameRules } from "../tanks/rules";
 import { Vector2 } from "./Vector2";
 
 export enum PlayerReadyState {

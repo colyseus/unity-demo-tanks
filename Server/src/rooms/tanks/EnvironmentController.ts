@@ -17,7 +17,7 @@ export enum MapIconValues {
 
 export class EnvironmentBuilder
 {
-    mapMatrix: number[][]; // 2D array to represent the terrain
+    // mapMatrix: number[][]; // 2D array to represent the terrain
 
     constructor (private state: TanksState) {}
 
@@ -27,7 +27,7 @@ export class EnvironmentBuilder
         this.state.world.width = width;
         this.state.world.height = height;
 
-        this.mapMatrix = new Array();
+        // this.mapMatrix = new Array();
 
         let randomSeed: number = Math.random() * 50;
         let variation: number = 1.5;
@@ -35,7 +35,7 @@ export class EnvironmentBuilder
         noise.SetNoiseType(fastNoise.Perlin);
         noise.SetFrequency(10);
 
-        for(let x = 0; x < width; ++x)
+        for (let x = 0; x < width; ++x)
         {
             //Determine height using perlin noise
             let xSample: number = (x / width) * variation + randomSeed;
@@ -43,12 +43,9 @@ export class EnvironmentBuilder
             let noiseHeight: number = (height * perlAmt);
             //iterate from bottom to top of matrix, setting values based off of perlin noise amount
             //Add a new array for this column
-            let column: Array<number> = new Array<number>();
-            for(let y = 0; y < height; ++y){
-                column.push(y < noiseHeight ? MapIconValues.GROUND : MapIconValues.EMPTY);
+            for (let y = 0; y < height; ++y) {
+                this.state.world.setGridValueAt(x, y, (y < noiseHeight) ? MapIconValues.GROUND : MapIconValues.EMPTY);
             }
-            //Add the column to the matrix
-            this.mapMatrix.push(column);
         }
 
         this.SetPlayerSpawns(height);
@@ -63,20 +60,22 @@ export class EnvironmentBuilder
         let playerTwoPlaced: boolean = false;
 
         let oneX: number = 5;
-        let twoX: number = this.mapMatrix.length - 5;
+        let twoX: number = this.state.world.width - 5;
+
         for (let y = 0; y < height; ++y)
         {
-            if (this.mapMatrix[oneX][y] == MapIconValues.EMPTY && !playerOnePlaced)
+            if (this.state.world.getGridValueAt(oneX, y) === MapIconValues.EMPTY && !playerOnePlaced)
             {
                 //We have nothing in this square
-                this.mapMatrix[oneX][y] = MapIconValues.PLAYER_1;
+                this.state.world.setGridValueAt(oneX, y, MapIconValues.PLAYER_1);
                 playerOnePlaced = true;
                 this.SetPlayerPosition(0, new Vector2(oneX, y));
             }
-            if (this.mapMatrix[twoX][y] == MapIconValues.EMPTY && !playerTwoPlaced)
+
+            if (this.state.world.getGridValueAt(twoX, y) === MapIconValues.EMPTY && !playerTwoPlaced)
             {
                 //We have nothing in this square
-                this.mapMatrix[twoX][y] = MapIconValues.PLAYER_2;
+                this.state.world.setGridValueAt(twoX, y, MapIconValues.PLAYER_2);
                 playerTwoPlaced = true;
                 this.SetPlayerPosition(1, new Vector2(twoX, y));
             }
@@ -101,15 +100,15 @@ export class EnvironmentBuilder
         const previousPos = this.GetPlayerPosition(playerNum);
 
         if (previousPos) {
-            this.mapMatrix[previousPos.x][previousPos.y] = MapIconValues.EMPTY;
+            this.state.world.setGridValueAt(previousPos.x, previousPos.y, MapIconValues.EMPTY);
         }
 
         player.coords.assign(coords);
 
         // Update the matrix
-        this.mapMatrix[coords.x][coords.y] = (playerNum == 0)
+        this.state.world.setGridValueAt(coords.x, coords.y, (playerNum == 0)
             ? MapIconValues.PLAYER_1
-            : MapIconValues.PLAYER_2;
+            : MapIconValues.PLAYER_2);
     }
 
     public TrimFirePathToEnvironment(origPath: Vector3[]): Vector3[] {
@@ -134,7 +133,7 @@ export class EnvironmentBuilder
                 try
                 {
                     //Check to see what is here
-                    switch (this.mapMatrix[coords.x][coords.y])
+                    switch (this.state.world.getGridValueAt(coords.x, coords.y))
                     {
                         case MapIconValues.EMPTY:
                             updatedPath.push(origPath[i].clone());
@@ -194,23 +193,23 @@ export class EnvironmentBuilder
         let newX: number = startPosition.x + direction;
         let newY: number = startPosition.y;
 
-        if (newX < 0 || newX >= this.mapMatrix.length)
+        if (newX < 0 || newX >= this.state.world.width)
         {
             //Cant go off the right or left of the map, do nothing?
             return startPosition;
         }
         
-        let mapValue = this.mapMatrix[newX][newY];
-        if (mapValue == MapIconValues.EMPTY)
+        let mapValue = this.state.world.getGridValueAt(newX, newY);
+        if (mapValue === MapIconValues.EMPTY)
         {
             newY = this.FindNextSafeGridPos(newX, newY);
         }
-        else if (mapValue == MapIconValues.GROUND)
+        else if (mapValue === MapIconValues.GROUND)
         {
             //Don't pass the top of the map
-            let yVal = Math.min(newY + 1, this.mapMatrix[0].length);
-            let mapVal = this.mapMatrix[newX][yVal];
-            if(mapVal == MapIconValues.EMPTY)
+            let yVal = Math.min(newY + 1, this.state.world.height);
+            let mapVal = this.state.world.getGridValueAt(newX, yVal);
+            if(mapVal === MapIconValues.EMPTY)
             {
                 newY = yVal;
             }
@@ -253,8 +252,8 @@ export class EnvironmentBuilder
 
         while(!groundFound)
         {
-            let mapVal = this.mapMatrix[startX][yVal];
-            if(mapVal == MapIconValues.EMPTY)
+            let mapVal = this.state.world.getGridValueAt(startX, yVal);
+            if(mapVal === MapIconValues.EMPTY)
             {
                 //This space is empty, check lower
                 startY = yVal;
@@ -331,13 +330,13 @@ export class EnvironmentBuilder
         let damagedPlayers: number[];
 
         //Get what is at this position
-        let mapItem: number = this.mapMatrix[coords.x][coords.y];
+        let mapItem: number = this.state.world.getGridValueAt(coords.x, coords.y);
         switch (mapItem)
         {
             case MapIconValues.GROUND:
             {
                 //Ground goes boom?
-                this.mapMatrix[coords.x][coords.y] = MapIconValues.EMPTY;
+                this.state.world.setGridValueAt(coords.x, coords.y, MapIconValues.EMPTY);
 
                 break;
             }
@@ -371,7 +370,7 @@ export class EnvironmentBuilder
         {
             for (let y = 0; y < this.mapHeight; ++y)
             {
-                let mapValue: number = this.mapMatrix[x][y];
+                let mapValue: number = this.state.world.getGridValueAt(x, y);
                 switch (mapValue)
                 {
                     case MapIconValues.PLAYER_1:
@@ -383,7 +382,7 @@ export class EnvironmentBuilder
                         if(newY != y) {
 
                             let playerPos: Vector2 = new Vector2(x, newY);
-                            this.updatePlayerPos(mapValue == MapIconValues.PLAYER_1, new Vector2(x,y), playerPos);
+                            this.updatePlayerPos(mapValue === MapIconValues.PLAYER_1, new Vector2(x,y), playerPos);
     
                             updatedPlayers.push({ playerId, playerPos });
                         }
@@ -462,8 +461,8 @@ export class EnvironmentBuilder
     private updatePlayerPos(playerOne: boolean, previousCoordinates: Vector2, newCoordinates: Vector2)
     {
         // Set the player's old spot to empty
-        this.mapMatrix[previousCoordinates.x][previousCoordinates.y] = MapIconValues.EMPTY;
+        this.state.world.setGridValueAt(previousCoordinates.x, previousCoordinates.y, MapIconValues.EMPTY);
         // Set the player's new spot to have the player
-        this.mapMatrix[newCoordinates.x][newCoordinates.y] = playerOne ? MapIconValues.PLAYER_1 : MapIconValues.PLAYER_2;
+        this.state.world.setGridValueAt(newCoordinates.x, newCoordinates.y, playerOne ? MapIconValues.PLAYER_1 : MapIconValues.PLAYER_2);
     }
 }
