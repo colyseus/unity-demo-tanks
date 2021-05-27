@@ -12,8 +12,6 @@ export class TanksRoom extends Room<TanksState> {
     environmentController: EnvironmentBuilder; // Generates and maintains the game's terrain
     currPlayerMoveWait: number = 0; // Counter to help with the wait before allowing another action after the player has moved
 
-    isPaused: boolean = true;
-
     patchRate = 50; // The ms delay between room state patch updates
 
     /**
@@ -109,13 +107,16 @@ export class TanksRoom extends Room<TanksState> {
             // skip if the user does not have enough Action Points to fire
             if (player.currentActionPoints <= GameRules.FiringActionPointCost) { return; }
 
-            // validate message input
             const barrelForward = message.barrelForward;
             const barrelPosition = message.barrelPosition;
             const cannonPower = message.cannonPower;
 
-            // 0 = barrel forward | 1 = barrel position | 2 = cannon power
-            if (barrelForward === undefined || barrelPosition === undefined || typeof(cannonPower) !== "number") {
+            // validate message input
+            if (
+                barrelForward === undefined ||
+                barrelPosition === undefined ||
+                typeof (cannonPower) !== "number"
+            ) {
                 throw "Error - Get Fire Path - Missing parameter";
             }
 
