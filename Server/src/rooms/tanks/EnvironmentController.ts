@@ -1,3 +1,4 @@
+import { ArraySchema } from "@colyseus/schema";
 import { Vector2, Vector3 } from "three";
 import { TanksState } from "../schema/TanksState";
 
@@ -27,6 +28,7 @@ export class EnvironmentBuilder
         this.state.world.width = width;
         this.state.world.height = height;
 
+        this.state.world.grid = new ArraySchema<number>();
         // this.mapMatrix = new Array();
 
         let randomSeed: number = Math.random() * 50;
