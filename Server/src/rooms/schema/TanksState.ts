@@ -16,7 +16,7 @@ export enum GameState {
 }
 
 export class TanksState extends Schema {
-    @type({ map: Player }) players = new MapSchema<Player>();
+    @type([ Player ]) players = new ArraySchema<Player>();
     @type([Weapon]) weapons = new ArraySchema<Weapon>();
     @type(World) world = new World();
 
@@ -41,13 +41,9 @@ export class TanksState extends Schema {
             // push weapon to weapons array
             this.weapons.push(weapon);
         }
-
-        this.restart();
     }
 
     restart() {
-        // TODO: generate environment
-
         // Reset players
         this.players.forEach((player) => {
             player.hp = GameRules.MaxHitPoints;
@@ -67,12 +63,6 @@ export class TanksState extends Schema {
         this.players.forEach((player) => player.resetActions());
     }
 
-    getPlayerByPlayerId(playerId: number) {
-        return Array
-            .from(this.players.values())
-            .find((player) => player.playerId === playerId);
-    }
-
     /**
      * Move the room game state to the new state
      * @param {GameState} newState The new state to move to
@@ -82,8 +72,8 @@ export class TanksState extends Schema {
         this.gameState = nextGameState;
     }
 
-    switchPlayerWeapon(sessionId: string, weaponIndex: number) {
-        const player = this.players.get(sessionId);
+    switchPlayerWeapon(playerId: number, weaponIndex: number) {
+        const player = this.players[playerId];
         if (
             player && 
             weaponIndex >= 0 && // validate weapon index
@@ -93,8 +83,8 @@ export class TanksState extends Schema {
         }
     }
 
-    getActiveWeapon(sessionId: string) {
-        const player = this.players.get(sessionId);
+    getActiveWeapon(playerId: number) {
+        const player = this.players[playerId];
         return this.weapons[player.currentWeapon] || this.weapons[0]; // fallback to weapons[0] 
     }
 

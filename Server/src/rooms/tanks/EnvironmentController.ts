@@ -18,8 +18,6 @@ export enum MapIconValues {
 
 export class EnvironmentBuilder
 {
-    // mapMatrix: number[][]; // 2D array to represent the terrain
-
     constructor (private state: TanksState) {}
 
     //Map Generation code
@@ -29,7 +27,6 @@ export class EnvironmentBuilder
         this.state.world.height = height;
 
         this.state.world.grid = new ArraySchema<number>();
-        // this.mapMatrix = new Array();
 
         let randomSeed: number = Math.random() * 50;
         let variation: number = 1.5;
@@ -93,13 +90,13 @@ export class EnvironmentBuilder
 
     //=======================================================================================================
 
-    public GetPlayerPosition(playerNum:number): Vector2Like {
-        return this.state.getPlayerByPlayerId(playerNum).coords;
+    public GetPlayerPosition(playerId: number): Vector2Like {
+        return this.state.players[playerId].coords;
     }
 
-    public SetPlayerPosition(playerNum: number, coords: Vector2) {
-        const player = this.state.getPlayerByPlayerId(playerNum);
-        const previousPos = this.GetPlayerPosition(playerNum);
+    public SetPlayerPosition(playerId: number, coords: Vector2) {
+        const player = this.state.players[playerId];
+        const previousPos = this.GetPlayerPosition(playerId);
 
         if (previousPos) {
             this.state.world.setGridValueAt(previousPos.x, previousPos.y, MapIconValues.EMPTY);
@@ -108,7 +105,7 @@ export class EnvironmentBuilder
         player.coords.assign(coords);
 
         // Update the matrix
-        this.state.world.setGridValueAt(coords.x, coords.y, (playerNum == 0)
+        this.state.world.setGridValueAt(coords.x, coords.y, (playerId == 0)
             ? MapIconValues.PLAYER_1
             : MapIconValues.PLAYER_2);
     }

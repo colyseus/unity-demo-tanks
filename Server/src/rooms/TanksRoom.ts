@@ -32,8 +32,13 @@ export class TanksRoom extends Room<TanksState> {
             previousGameState: GameState.None,
         }));
 
-        this.environmentController = new EnvironmentBuilder(this.state);
+        // pre-populate players by "playerId"
+        // - state.players[0] is playerId=0
+        // - state.players[1] is playerId=1
+        this.state.players.push(new Player());
+        this.state.players.push(new Player());
 
+        this.environmentController = new EnvironmentBuilder(this.state);
         this.resetForNewRound();
 
         // Set the callback for the "ping" message for tracking server-client latency
@@ -43,7 +48,7 @@ export class TanksRoom extends Room<TanksState> {
 
         // Set player as "ready"
         this.onMessage("ready", (client) => {
-            const player = this.state.players.get(client.sessionId);
+            const player = this.state.players[client.userData.playerId];
             if (player) {
                 player.readyState = PlayerReadyState.READY;
             }
@@ -51,7 +56,7 @@ export class TanksRoom extends Room<TanksState> {
 
         this.onMessage("skipTurn", (client, message) => {
             // Check if the player can do the action
-            if (this.canDoAction(client.sessionId) == false) {
+            if (this.canDoAction(client.userData.playerId) == false) {
                 return;
             }
 
@@ -60,18 +65,18 @@ export class TanksRoom extends Room<TanksState> {
 
         this.onMessage("changeWeapon", (client, message) => {
             // Check if the player can do the action
-            if (this.canDoAction(client.sessionId) == false) {
+            if (this.canDoAction(client.userData.playerId) == false) {
                 return;
             }
 
-            this.state.switchPlayerWeapon(client.sessionId, message);
+            this.state.switchPlayerWeapon(client.userData.playerId, message);
         });
 
         this.onMessage("movePlayer", (client, direction) => {
             // Skip if the player cannot do the action
-            if (this.canDoAction(client.sessionId) === false) { return; }
+            if (this.canDoAction(client.userData.playerId) === false) { return; }
 
-            const player = this.state.players.get(client.sessionId);
+            const player = this.state.players[client.userData.playerId];
 
             // Skip if movement is not possible
             if (!player.isMovementAllowed()) { return; }
@@ -98,11 +103,11 @@ export class TanksRoom extends Room<TanksState> {
 
         this.onMessage("getFirePath", (client, message) => {
             // Check if the player can do the action
-            if (this.canDoAction(client.sessionId) == false) {
+            if (this.canDoAction(client.userData.playerId) == false) {
                 return;
             }
 
-            const player = this.state.players.get(client.sessionId);
+            const player = this.state.players[client.userData.playerId];
 
             // skip if the user does not have enough Action Points to fire
             if (player.currentActionPoints <= GameRules.FiringActionPointCost) { return; }
@@ -129,7 +134,7 @@ export class TanksRoom extends Room<TanksState> {
             );
 
             // Get the player's currently active weapon
-            const activeWeapon = this.state.getActiveWeapon(client.sessionId);
+            const activeWeapon = this.state.getActiveWeapon(client.userData.playerId);
 
             // Send the path to the environment controller to check if any damage is done to terrain or player
             const damageData = this.environmentController.dealDamage(
@@ -140,7 +145,7 @@ export class TanksRoom extends Room<TanksState> {
 
             if (damageData) {
                 damageData.updatedPlayers.forEach((updatedPlayer) => {
-                    const player = this.state.getPlayerByPlayerId(updatedPlayer.playerId);
+                    const player = this.state.players[updatedPlayer.playerId];
 
                     // Update player HP if there is damage
                     if (updatedPlayer.damage) {
@@ -179,20 +184,32 @@ export class TanksRoom extends Room<TanksState> {
     onJoin(client: Client, options: any) {
         console.info(`Client joined! - ${client.sessionId} ***`);
 
-        const isCreator = (this.state.players.size === 0);
+        //
+        // FIXME: (assign playerId based on first "connected=false" player within state.players)
+        //
+        // If "creator" leaves the room while an opponent is still connected,
+        // when a next player joins, he's going to have the same "playerId" as
+        // the existing player.
+        // 
+        const isCreator = (this.clients.length === 1);
 
-        const newPlayer = new Player().assign({
+        // attach custom data to the client.
+        client.userData = {
+            playerId: (isCreator) ? 0 : 1
+        };
+
+        const player = this.state.players[client.userData.playerId];
+
+        // Assign data to be synchronized
+        player.assign({
             sessionId: client.sessionId,
             name: options.displayName,
-            playerId: (isCreator) ? 0 : 1,
+            playerId: client.userData.playerId,
         });
-
-        // Set player instance to be synchronized
-        this.state.players.set(client.sessionId, newPlayer);
 
         // Set team0 / team1 key on room's metadata
         this.setMetadata({
-            [`team${newPlayer.playerId}`]: client.sessionId
+            [`team${player.playerId}`]: client.sessionId
         });
     }
 
@@ -255,25 +272,18 @@ export class TanksRoom extends Room<TanksState> {
 
     /**
      * Checks if the game is in the simulate round state and if it's the player's turn
-     * @param sessionId Session Id of the player we're checking
+     * @param playerId Session Id of the player we're checking
      * @returns 
      */
-    private canDoAction(sessionId: string): boolean {
+    private canDoAction(playerId: number): boolean {
         const notMoving = this.state.isPlayerMoving === false;
         const goodGameState = (this.state.gameState === GameState.SimulateRound);
 
-        return goodGameState && this.isPlayersTurn(sessionId) && notMoving;
-    }
-
-    /**
-     * Checks if it is a player's turn using their session Id
-     * @param sessionId Session Id of the player we want to check for
-     * @returns True if it is the player's turn
-     */
-    private isPlayersTurn(sessionId: string): boolean {
-        let playerNum = this.state.currentTurn;
-        let playerTurnId = this.state.players.get(sessionId).playerId;
-        return playerNum == playerTurnId;
+        return (
+            goodGameState && 
+            playerId === this.state.currentTurn && // is current turn?
+            notMoving
+        );
     }
 
     /**
@@ -294,7 +304,7 @@ export class TanksRoom extends Room<TanksState> {
 
     // Callback when a client has left the room
     async onLeave(client: Client, consented: boolean) {
-        const leavingPlayer = this.state.players.get(client.sessionId);
+        const leavingPlayer = this.state.players[client.userData.playerId];
         if (!leavingPlayer) {
             console.error(`*** onLeave - No Player for sessionId - ${client.sessionId} ***`);
             return;
