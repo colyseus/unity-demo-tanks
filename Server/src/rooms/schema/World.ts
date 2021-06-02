@@ -11,12 +11,19 @@ export class World extends Schema {
     @type(["number"]) grid: ArraySchema<number>; // 1D grid ()
 
     setGridValueAt(x: number, y: number, value: number) {
+
         const index = x + this.width * y;
-        this.grid[index] = value;
+        
+        //console.log(`*** Set Grid Value At (${x}, ${y}) = ${value} - Index = ${index} ***`);
+
+        this.grid.setAt(index, value); /*this.grid[index] = value;*/ 
     }
 
     getGridValueAt(x: number, y: number) {
         const index = x + this.width * y;
-        return this.grid[index];
+
+        //console.log(`*** GET Grid Value At (${x}, ${y}) = ${this.grid.at(index)} - Index = ${index} ***`);
+
+        return this.grid.at(index);// this.grid[index];
     }
 }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Colyseus;
 using LucidSightTools;
+using Tanks;
 using UnityEngine;
 
 public class ExampleManager : ColyseusManager<ExampleManager>
@@ -11,7 +12,7 @@ public class ExampleManager : ColyseusManager<ExampleManager>
     public static OnRoomsReceived onRoomsReceived;
     private ExampleNetworkedEntityFactory _networkedEntityFactory;
 
-    public ColyseusRoom<ExampleRoomState> Room
+    public ColyseusRoom<TanksState> Room
     {
         get
         {

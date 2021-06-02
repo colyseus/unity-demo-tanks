@@ -8,6 +8,7 @@ using GameDevWare.Serialization;
 using LucidSightTools;
 using NativeWebSocket;
 using UnityEngine;
+using Tanks;
 
 /// <summary>
 ///     Manages the rooms of a server connection.
@@ -35,10 +36,10 @@ public class ExampleRoomController
 
     //Custom game delegate functions
     //======================================
-    public delegate void OnRoomStateChanged(MapSchema<string> attributes);
+    public delegate void OnRoomStateChanged(TanksState state, bool isFirstState);
 
 
-    public delegate void OnUserStateChanged(MapSchema<string> changes);
+    public delegate void OnUserStateChanged(Player state/*MapSchema<string> changes*/);
 
     /// <summary>
     ///     Event for when a NetworkEntity is added to the room.
@@ -73,8 +74,11 @@ public class ExampleRoomController
         new Dictionary<string, Action<ExampleNetworkedEntity>>();
 
 
-    public delegate void OnInitialSetup(int playerTurnId, int currentPlayerTurn, int currentAP, string[] playerNames, int[] playerHP, WeaponModel currentWeapon, List<List<int>> mapMatrix, bool challengerOnline);
-    public static event OnInitialSetup onInitialSetup;
+    //public delegate void OnInitialSetup(int playerTurnId, int currentPlayerTurn, int currentAP, string[] playerNames, int[] playerHP, WeaponModel currentWeapon, List<List<int>> mapMatrix, bool challengerOnline);
+    //public static event OnInitialSetup onInitialSetup;
+
+    public delegate void OnWorldChanged(List<DataChange> changes);
+    public static event OnWorldChanged onWorldChanged;
 
     public delegate void OnReceivedFirePath(int player, int remainingAP, List<Vector3> firePath, DamageData damageData);
     public static event OnReceivedFirePath onReceivedFirePath;
@@ -94,7 +98,7 @@ public class ExampleRoomController
     public delegate void OnTurnCompleted(bool wasSkip);
     public static OnTurnCompleted onTurnCompleted;
 
-    public delegate void OnTankMoved(int player, int remainingAP, Vector2 newCoords);
+    public delegate void OnTankMoved(int player, int remainingAP, Tanks.Vector2 newCoords);
     public static OnTankMoved onTankMoved;
 
     //==========================
@@ -141,7 +145,7 @@ public class ExampleRoomController
     /// <summary>
     ///     The current or active Room we get when joining or creating a room.
     /// </summary>
-    private ColyseusRoom<ExampleRoomState> _room;
+    private ColyseusRoom<Tanks.TanksState> _room;
 
     /// <summary>
     ///     The time as received from the server in milliseconds.
@@ -151,8 +155,8 @@ public class ExampleRoomController
     /// <summary>
     ///     Collection for tracking users that have joined the room.
     /// </summary>
-    private IndexedDictionary<string, ExampleNetworkedUser> _users =
-        new IndexedDictionary<string, ExampleNetworkedUser>();
+    private IndexedDictionary<int, Player> _users =
+        new IndexedDictionary<int, Player>();
 
     /// <summary>
     ///     Used to help calculate the latency of the connection to the server.
@@ -195,7 +199,7 @@ public class ExampleRoomController
         get { return _lastPong - _lastPing; }
     }
 
-    public ColyseusRoom<ExampleRoomState> Room
+    public ColyseusRoom<Tanks.TanksState> Room
     {
         get { return _room; }
     }
@@ -321,7 +325,7 @@ public class ExampleRoomController
                 options.Add(option.Key, option.Value);
             }
 
-            _room = await client.Create<ExampleRoomState>(roomName, options);
+            _room = await client.Create<Tanks.TanksState>(roomName, options);
         }
         catch (Exception ex)
         {
@@ -351,7 +355,7 @@ public class ExampleRoomController
                 options.Add(option.Key, option.Value);
             }
 
-            _room = await _client.JoinOrCreate<ExampleRoomState>(roomName, options);
+            _room = await _client.JoinOrCreate<Tanks.TanksState>(roomName, options);
         }
         catch (Exception ex)
         {
@@ -433,7 +437,8 @@ public class ExampleRoomController
         });
 
         //Custom game logic
-        _room.OnMessage<TankTurnUpdateMessage>("initialSetUp", (message) => { onInitialSetup?.Invoke(message.playerTurnId, message.playerTurn, message.currentPlayerAP, message.playerNames, message.playerHP, message.currentWeapon, message.worldMap, message.challengerOnline); });
+        _room.State.world.OnChange += changes => onWorldChanged?.Invoke(changes);
+        //_room.OnMessage<TankTurnUpdateMessage>("initialSetUp", (message) => { onInitialSetup?.Invoke(message.playerTurnId, message.playerTurn, message.currentPlayerAP, message.playerNames, message.playerHP, message.currentWeapon, message.worldMap, message.challengerOnline); });
 
         _room.OnMessage<TankTurnUpdateMessage>("turnComplete", (message) =>
         {
@@ -454,8 +459,8 @@ public class ExampleRoomController
         _room.OnMessage<ExampleCustomMethodMessage>("onPlayerLeave", (message) => {onPlayerLeave?.Invoke();});
         //========================
         
-        _room.State.networkedUsers.OnAdd += OnUserAdd;
-        _room.State.networkedUsers.OnRemove += OnUserRemove;
+        _room.State.players/*networkedUsers*/.OnAdd += OnUserAdd;
+        _room.State.players/*networkedUsers*/.OnRemove += OnUserRemove;
 
         _room.State.TriggerAll();
         //========================
@@ -495,8 +500,8 @@ public class ExampleRoomController
 
         //_room.State.networkedEntities.OnAdd -= OnEntityAdd;
         //_room.State.networkedEntities.OnRemove -= OnEntityRemoved;
-        _room.State.networkedUsers.OnAdd -= OnUserAdd;
-        _room.State.networkedUsers.OnRemove -= OnUserRemove;
+        _room.State.players/*networkedUsers*/.OnAdd -= OnUserAdd;
+        _room.State.players/*networkedUsers*/.OnRemove -= OnUserRemove;
 
         _room.colyseusConnection.OnError -= Room_OnError;
         _room.colyseusConnection.OnClose -= Room_OnClose;
@@ -538,7 +543,7 @@ public class ExampleRoomController
                 //{
                     options.Add("joiningId", ExampleManager.Instance.UserName);
                 //}
-                _room = await _client.JoinById<ExampleRoomState>(roomId, options);
+                _room = await _client.JoinById<Tanks.TanksState>(roomId, options);
 
                 if (_room == null || !_room.colyseusConnection.IsOpen)
                 {
@@ -621,9 +626,9 @@ public class ExampleRoomController
     /// </summary>
     /// <param name="user">The user object</param>
     /// <param name="key">The user key</param>
-    private void OnUserAdd(string key, ExampleNetworkedUser user)
+    private void OnUserAdd(int key, Tanks.Player user)
     {
-        LSLog.LogImportant($"user [{user.__refId} | {user.id} | key {key}] Joined");
+        LSLog.LogImportant($"user [{user.__refId} | {user.sessionId/*id*/} | key {key}] Joined");
 
         // Add "player" to map of players
         _users.Add(key, user);
@@ -631,13 +636,14 @@ public class ExampleRoomController
         // On entity update...
         user.OnChange += changes =>
         {
-            user.updateHash = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+            LSLog.LogImportant($"User.OnChange!", LSLog.LogColor.cyan);
+            //user.updateHash = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
 
             // If the change is for our current user then fire the event with the attributes that changed
             if (ExampleManager.Instance.CurrentUser != null &&
                 string.Equals(ExampleManager.Instance.CurrentUser.sessionId, user.sessionId))
             {
-                OnCurrentUserStateChanged?.Invoke(user.attributes);
+                OnCurrentUserStateChanged?.Invoke(user/*.attributes*/);
             }
         };
     }
@@ -647,9 +653,9 @@ public class ExampleRoomController
     /// </summary>
     /// <param name="user">The removed user.</param>
     /// <param name="key">The user key.</param>
-    private void OnUserRemove(string key, ExampleNetworkedUser user)
+    private void OnUserRemove(int key, Player/*ExampleNetworkedUser*/ user)
     {
-        LSLog.LogImportant($"user [{user.__refId} | {user.id} | key {key}] Left");
+        LSLog.LogImportant($"user [{user.__refId} | {user.sessionId/*id*/} | key {key}] Left");
 
         _users.Remove(key);
     }
@@ -677,11 +683,11 @@ public class ExampleRoomController
     /// </summary>
     /// <param name="state">The room state.</param>
     /// <param name="isFirstState">Is it the first state?</param>
-    private static void OnStateChangeHandler(ExampleRoomState state, bool isFirstState)
+    private static void OnStateChangeHandler(Tanks.TanksState state, bool isFirstState)
     {
         // Setup room first state
-        //LSLog.LogImportant("State has been updated!");
-        onRoomStateChanged?.Invoke(state.attributes);
+        LSLog.LogImportant($"Room State has been updated! - {isFirstState}");
+        onRoomStateChanged?.Invoke(state/*.attributes*/, isFirstState);
     }
 
     /// <summary>
@@ -690,7 +696,7 @@ public class ExampleRoomController
     /// <param name="roomToPing">The <see cref="ColyseusRoom{T}" /> to ping.</param>
     private void RunPingThread(object roomToPing)
     {
-        ColyseusRoom<ExampleRoomState> currentRoom = (ColyseusRoom<ExampleRoomState>) roomToPing;
+        ColyseusRoom<TanksState> currentRoom = (ColyseusRoom<TanksState>) roomToPing;
 
         const float pingInterval = 0.5f; // seconds
         const float pingTimeout = 15f; //seconds

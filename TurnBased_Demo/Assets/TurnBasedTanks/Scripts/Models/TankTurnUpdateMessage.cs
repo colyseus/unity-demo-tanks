@@ -23,7 +23,7 @@ public class TankMoveMessage
 {
     public int playerNumber;
     public int remainingAP;
-    public Vector2 newCoords;
+    public Tanks.Vector2 newCoords;
 }
 
 [Serializable]

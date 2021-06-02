@@ -1,5 +1,6 @@
 import { ArraySchema } from "@colyseus/schema";
 import { Vector2, Vector3 } from "three";
+import logger from "../../helpers/logger";
 import { TanksState } from "../schema/TanksState";
 
 const fastNoise = require("fastnoisejs");
@@ -19,14 +20,21 @@ export enum MapIconValues {
 export class EnvironmentBuilder
 {
     constructor (private state: TanksState) {}
+    
+    localGrid: number[];
 
     //Map Generation code
     //=======================================================================================================
     public GenerateEnvironment(width: number, height: number){
+
+        //console.log(`*** Environment Controller - Generate Environment - (${width},${height})`);
+
         this.state.world.width = width;
         this.state.world.height = height;
 
-        this.state.world.grid = new ArraySchema<number>();
+        this.state.world.grid = new ArraySchema<number>(width * height);
+
+        this.localGrid = new Array(width * height);
 
         let randomSeed: number = Math.random() * 50;
         let variation: number = 1.5;
@@ -43,38 +51,71 @@ export class EnvironmentBuilder
             //iterate from bottom to top of matrix, setting values based off of perlin noise amount
             //Add a new array for this column
             for (let y = 0; y < height; ++y) {
-                this.state.world.setGridValueAt(x, y, (y < noiseHeight) ? MapIconValues.GROUND : MapIconValues.EMPTY);
+                let val: number = (y < noiseHeight) ? MapIconValues.GROUND : MapIconValues.EMPTY;
+                
+                this.SetGridValueAt(x, y, val);
             }
         }
 
         this.SetPlayerSpawns(height);
+        
+        //console.log(JSON.stringify(this.state.world.grid));
+
+        //console.log(`*** Environment Array Length = ${this.state.world.grid.length}  `);
+
     }
 
     // Alias for world width/height
     get mapWidth () { return this.state.world.width; }
     get mapHeight () { return this.state.world.height; }
 
+    private SetGridValueAt(x: number, y: number, value: number) {
+
+        this.state.world.setGridValueAt(x, y, value);
+        this.SetLocalGridValue(x, y, value);
+    }
+
+    private SetLocalGridValue(x: number, y: number, value: number) {
+        const index = x + this.mapWidth * y;
+        
+        this.localGrid[index] = value;
+    }
+
+    private GetLocalGridValueAt(x: number, y: number): number {
+        const index = x + this.mapWidth * y;
+
+        return this.localGrid[index];
+    }
+
     private SetPlayerSpawns(height: number){
+
         let playerOnePlaced: boolean = false;
         let playerTwoPlaced: boolean = false;
 
         let oneX: number = 5;
         let twoX: number = this.state.world.width - 5;
 
-        for (let y = 0; y < height; ++y)
+        for (let y = 0; y < height && (!playerOnePlaced || !playerTwoPlaced); ++y)
         {
-            if (this.state.world.getGridValueAt(oneX, y) === MapIconValues.EMPTY && !playerOnePlaced)
+            let gridOneVal: number = /*this.state.world.getGridValueAt(oneX, y)*/this.GetLocalGridValueAt(oneX, y);
+            let gridTwoVal: number = /*this.state.world.getGridValueAt(twoX, y)*/this.GetLocalGridValueAt(twoX, y);
+
+            if (gridOneVal === MapIconValues.EMPTY && !playerOnePlaced)
             {
+                //logger.silly(`*** Place Player One at (${oneX}, ${y}) ***`);
+
                 //We have nothing in this square
-                this.state.world.setGridValueAt(oneX, y, MapIconValues.PLAYER_1);
+                this.SetGridValueAt(oneX, y, MapIconValues.PLAYER_1);
                 playerOnePlaced = true;
                 this.SetPlayerPosition(0, new Vector2(oneX, y));
             }
 
-            if (this.state.world.getGridValueAt(twoX, y) === MapIconValues.EMPTY && !playerTwoPlaced)
+            if (gridTwoVal === MapIconValues.EMPTY && !playerTwoPlaced)
             {
+                //logger.silly(`*** Place Player Two at (${twoX}, ${y}) ***`);
+
                 //We have nothing in this square
-                this.state.world.setGridValueAt(twoX, y, MapIconValues.PLAYER_2);
+                this.SetGridValueAt(twoX, y, MapIconValues.PLAYER_2);
                 playerTwoPlaced = true;
                 this.SetPlayerPosition(1, new Vector2(twoX, y));
             }
@@ -98,14 +139,14 @@ export class EnvironmentBuilder
         const player = this.state.players[playerId];
         const previousPos = this.GetPlayerPosition(playerId);
 
-        if (previousPos) {
-            this.state.world.setGridValueAt(previousPos.x, previousPos.y, MapIconValues.EMPTY);
+        if (previousPos && previousPos.x && previousPos.y) {
+            this.SetGridValueAt(previousPos.x, previousPos.y, MapIconValues.EMPTY);
         }
 
         player.coords.assign(coords);
 
         // Update the matrix
-        this.state.world.setGridValueAt(coords.x, coords.y, (playerId == 0)
+        this.SetGridValueAt(coords.x, coords.y, (playerId == 0)
             ? MapIconValues.PLAYER_1
             : MapIconValues.PLAYER_2);
     }
@@ -132,7 +173,7 @@ export class EnvironmentBuilder
                 try
                 {
                     //Check to see what is here
-                    switch (this.state.world.getGridValueAt(coords.x, coords.y))
+                    switch (this.GetLocalGridValueAt(coords.x, coords.y))
                     {
                         case MapIconValues.EMPTY:
                             updatedPath.push(origPath[i].clone());
@@ -198,7 +239,7 @@ export class EnvironmentBuilder
             return startPosition;
         }
         
-        let mapValue = this.state.world.getGridValueAt(newX, newY);
+        let mapValue = this.GetLocalGridValueAt(newX, newY);
         if (mapValue === MapIconValues.EMPTY)
         {
             newY = this.FindNextSafeGridPos(newX, newY);
@@ -207,7 +248,7 @@ export class EnvironmentBuilder
         {
             //Don't pass the top of the map
             let yVal = Math.min(newY + 1, this.state.world.height);
-            let mapVal = this.state.world.getGridValueAt(newX, yVal);
+            let mapVal = this.GetLocalGridValueAt(newX, yVal);
             if(mapVal === MapIconValues.EMPTY)
             {
                 newY = yVal;
@@ -251,7 +292,7 @@ export class EnvironmentBuilder
 
         while(!groundFound)
         {
-            let mapVal = this.state.world.getGridValueAt(startX, yVal);
+            let mapVal = this.GetLocalGridValueAt(startX, yVal);
             if(mapVal === MapIconValues.EMPTY)
             {
                 //This space is empty, check lower
@@ -329,13 +370,13 @@ export class EnvironmentBuilder
         let damagedPlayers: number[];
 
         //Get what is at this position
-        let mapItem: number = this.state.world.getGridValueAt(coords.x, coords.y);
+        let mapItem: number = this.GetLocalGridValueAt(coords.x, coords.y);
         switch (mapItem)
         {
             case MapIconValues.GROUND:
             {
                 //Ground goes boom?
-                this.state.world.setGridValueAt(coords.x, coords.y, MapIconValues.EMPTY);
+                this.SetGridValueAt(coords.x, coords.y, MapIconValues.EMPTY);
 
                 break;
             }
@@ -369,7 +410,7 @@ export class EnvironmentBuilder
         {
             for (let y = 0; y < this.mapHeight; ++y)
             {
-                let mapValue: number = this.state.world.getGridValueAt(x, y);
+                let mapValue: number = this.GetLocalGridValueAt(x, y);
                 switch (mapValue)
                 {
                     case MapIconValues.PLAYER_1:
@@ -460,8 +501,8 @@ export class EnvironmentBuilder
     private updatePlayerPos(playerOne: boolean, previousCoordinates: Vector2, newCoordinates: Vector2)
     {
         // Set the player's old spot to empty
-        this.state.world.setGridValueAt(previousCoordinates.x, previousCoordinates.y, MapIconValues.EMPTY);
+        this.SetGridValueAt(previousCoordinates.x, previousCoordinates.y, MapIconValues.EMPTY);
         // Set the player's new spot to have the player
-        this.state.world.setGridValueAt(newCoordinates.x, newCoordinates.y, playerOne ? MapIconValues.PLAYER_1 : MapIconValues.PLAYER_2);
+        this.SetGridValueAt(newCoordinates.x, newCoordinates.y, playerOne ? MapIconValues.PLAYER_1 : MapIconValues.PLAYER_2);
     }
 }

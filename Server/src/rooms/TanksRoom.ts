@@ -4,6 +4,7 @@ import { Player, PlayerReadyState } from "./schema/Player";
 import { EnvironmentBuilder } from "./tanks/EnvironmentController";
 import { GameRules } from "./tanks/rules";
 import { Vector3 } from "three";
+import logger from "../helpers/logger";
 
 export class TanksRoom extends Room<TanksState> {
     
@@ -25,18 +26,25 @@ export class TanksRoom extends Room<TanksState> {
 
         this.maxClients = 2;
         this.autoDispose = false;
+        this.roomId = options["roomId"];
 
         // Initialize initial room state
         this.setState(new TanksState().assign({
             gameState: GameState.SimulateRound,
             previousGameState: GameState.None,
+            creatorId: options["creatorId"]
         }));
 
         // pre-populate players by "playerId"
         // - state.players[0] is playerId=0
         // - state.players[1] is playerId=1
-        this.state.players.push(new Player());
-        this.state.players.push(new Player());
+        this.state.players.push(new Player().assign({
+            name: options["creatorId"],
+            playerId: 0
+        }));
+        this.state.players.push(new Player().assign({
+            playerId: 1
+        }));
 
         this.environmentController = new EnvironmentBuilder(this.state);
         this.resetForNewRound();
@@ -182,7 +190,7 @@ export class TanksRoom extends Room<TanksState> {
 
     // Callback when a client has joined the room
     onJoin(client: Client, options: any) {
-        console.info(`Client joined! - ${client.sessionId} ***`);
+        console.info(`Client joined! - ${client.sessionId} ***`); console.log(options);
 
         //
         // FIXME: (assign playerId based on first "connected=false" player within state.players)
@@ -191,21 +199,37 @@ export class TanksRoom extends Room<TanksState> {
         // when a next player joins, he's going to have the same "playerId" as
         // the existing player.
         // 
-        const isCreator = (this.clients.length === 1);
+        const username = options["joiningId"] || options["creatorId"];
+
+        const isCreator = this.state.creatorId === username; // (this.clients.length === 1);
+
+        logger.info(`*** On Join - Username = ${username} - Is Creator = ${isCreator} ***`);
 
         // attach custom data to the client.
         client.userData = {
             playerId: (isCreator) ? 0 : 1
         };
 
-        const player = this.state.players[client.userData.playerId];
+        const player: Player = this.state.players[client.userData.playerId];
+
+        let playerSetting = {};
+
+        if(isCreator) {
+            // Just update the sessionId of the creator player
+            playerSetting = {
+                sessionId: client.sessionId
+            }
+        }
+        else {
+            // Update relevant data for challenger player
+            playerSetting = {
+                sessionId: client.sessionId,
+                name: username
+            }
+        }
 
         // Assign data to be synchronized
-        player.assign({
-            sessionId: client.sessionId,
-            name: options.displayName,
-            playerId: client.userData.playerId,
-        });
+        player.assign(playerSetting);
 
         // Set team0 / team1 key on room's metadata
         this.setMetadata({

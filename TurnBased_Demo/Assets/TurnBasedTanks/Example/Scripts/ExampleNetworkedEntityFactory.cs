@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Colyseus;
 using GameDevWare.Serialization;
 using LucidSightTools;
+using Tanks;
 
 /// <summary>
 /// Responsible for carrying out the creation of network entities and registering them with the Example Manager.
@@ -32,7 +33,7 @@ public class ExampleNetworkedEntityFactory
     /// <param name="position">Position for the new entity</param>
     /// <param name="rotation">Position for the new entity</param>
     /// <param name="attributes">Position for the new entity</param>
-    public void InstantiateNetworkedEntity(ColyseusRoom<ExampleRoomState> room, string prefab, Vector3 position, Quaternion rotation,
+    public void InstantiateNetworkedEntity(ColyseusRoom<TanksState> room, string prefab, Vector3 position, Quaternion rotation,
         Dictionary<string, object> attributes = null)
     {
         if (string.IsNullOrEmpty(prefab))
@@ -66,7 +67,7 @@ public class ExampleNetworkedEntityFactory
     /// <param name="attributes">Position for the new entity</param>
     /// <param name="viewToAssign">The provided view that will be assigned to the new <see cref="ExampleNetworkedEntity"/></param>
     /// <param name="callback">Callback that will be invoked with the newly created <see cref="ExampleNetworkedEntity"/></param>
-    public void CreateNetworkedEntity(ColyseusRoom<ExampleRoomState> room, string prefab, Dictionary<string, object> attributes = null, ColyseusNetworkedEntityView viewToAssign = null, Action<ExampleNetworkedEntity> callback = null)
+    public void CreateNetworkedEntity(ColyseusRoom<TanksState> room, string prefab, Dictionary<string, object> attributes = null, ColyseusNetworkedEntityView viewToAssign = null, Action<ExampleNetworkedEntity> callback = null)
     {
         Dictionary<string, object> updatedAttributes = (attributes != null)
             ? new Dictionary<string, object>(attributes)
@@ -82,7 +83,7 @@ public class ExampleNetworkedEntityFactory
     /// <param name="attributes">Position for the new entity</param>
     /// <param name="viewToAssign">The provided view that will be assigned to the new <see cref="ExampleNetworkedEntity"/></param>
     /// <param name="callback">Callback that will be invoked with the newly created <see cref="ExampleNetworkedEntity"/></param>
-    public void CreateNetworkedEntity(ColyseusRoom<ExampleRoomState> room, Dictionary<string, object> attributes = null, ColyseusNetworkedEntityView viewToAssign = null, Action<ExampleNetworkedEntity> callback = null)
+    public void CreateNetworkedEntity(ColyseusRoom<TanksState> room, Dictionary<string, object> attributes = null, ColyseusNetworkedEntityView viewToAssign = null, Action<ExampleNetworkedEntity> callback = null)
     {
         try
         {
@@ -133,7 +134,7 @@ public class ExampleNetworkedEntityFactory
     /// <param name="attributes">Position for the new entity</param>
     /// <param name="viewToAssign">The provided view that will be assigned to the new <see cref="ExampleNetworkedEntity"/></param>
     /// <param name="callback">Callback that will be invoked with the newly created <see cref="ExampleNetworkedEntity"/></param>
-    public void CreateNetworkedEntityWithTransform(ColyseusRoom<ExampleRoomState> room, Vector3 position, Quaternion rotation,
+    public void CreateNetworkedEntityWithTransform(ColyseusRoom<TanksState> room, Vector3 position, Quaternion rotation,
         Dictionary<string, object> attributes = null, ColyseusNetworkedEntityView viewToAssign = null,
         Action<ExampleNetworkedEntity> callback = null)
     {

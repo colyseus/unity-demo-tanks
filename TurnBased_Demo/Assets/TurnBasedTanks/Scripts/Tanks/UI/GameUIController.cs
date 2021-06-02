@@ -98,15 +98,17 @@ public class GameUIController : MonoBehaviour
         loadingCover.gameObject.SetActive(show);
     }
 
-    public void UpdateMap(List<List<int>> map)
+    public void UpdateMap(EnvironmentBuilder environment)
     {
         string text = "";
-        for (int y = map[0].Count - 1; y >= 0; --y)
+        int gridValue;
+        for (int y = environment.MapHeight - 1/*map[0].Count - 1*/; y >= 0; --y)
         {
-            for (int x = 0; x < map.Count; ++x)
+            for (int x = 0; x < environment.MapWidth/*map.Count*/; ++x)
             {
-                string item = map[x][y].ToString();
-                switch (map[x][y])
+                gridValue = (int)environment.GetGridValueAt(x, y, out int idx);
+                string item = gridValue.ToString(); /*map[x][y].ToString();*/
+                switch (gridValue)
                 {
                     case (int)EnvironmentBuilder.eMapItem.EMPTY:
                         item = $"<color=#75B8FF>X</color>";

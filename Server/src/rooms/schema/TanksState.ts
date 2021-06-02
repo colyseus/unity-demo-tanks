@@ -29,6 +29,7 @@ export class TanksState extends Schema {
     @type("string") statusMessage: string;
 
     isPlayerMoving: boolean = false;
+    creatorId: string = "";
 
     constructor() {
         super();
@@ -44,6 +45,12 @@ export class TanksState extends Schema {
     }
 
     restart() {
+
+        this.currentTurn = 0;
+        this.turnNumber = 0;
+        this.statusMessage = "";
+        this.isPlayerMoving = false;
+
         // Reset players
         this.players.forEach((player) => {
             player.hp = GameRules.MaxHitPoints;
