@@ -230,6 +230,50 @@ export class TanksRoom extends Room<TanksState> {
             }
         });
 
+        this.onMessage("fireWeapon", (client, message) => {
+
+            // Check if the player can do the action
+            if (this.canDoAction(client.userData.playerId) == false) {
+
+                logger.info(`*** Player can't do action - ${client.userData.playerId} ***`);
+                return;
+            }
+
+            const player = this.state.players[client.userData.playerId];
+
+            // skip if the user does not have enough Action Points to fire
+            if (player.currentActionPoints <= GameRules.FiringActionPointCost) { 
+                
+                logger.info(`*** Player does not have enough AP! - ${client.userData.playerId} ***`);
+                return; 
+            }
+
+            const barrelForward = message.barrelForward;
+            const barrelPosition = message.barrelPosition;
+            const cannonPower = message.cannonPower;
+
+            // validate message input
+            if (
+                barrelForward === undefined ||
+                barrelPosition === undefined ||
+                typeof (cannonPower) !== "number"
+            ) {
+                throw "Error - Get Fire Path - Missing parameter";
+            }
+
+            console.log(`*** Fire Weapon - Barrel Forward =`, barrelForward, `  Barrel Pos = `, barrelPosition, `  Cannon Power = `, cannonPower, ` ***`);
+
+            // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
+            let firePath: Vector3[] = this.state.getFirePath(
+                this.environmentController,
+                new Vector3(barrelForward.x, barrelForward.y, barrelForward.z),
+                new Vector3(barrelPosition.x, barrelPosition.y, barrelPosition.z),
+                cannonPower
+            );
+
+
+        });
+
         this.onMessage("getFirePath", (client, message) => {
             // Check if the player can do the action
             if (this.canDoAction(client.userData.playerId) == false) {

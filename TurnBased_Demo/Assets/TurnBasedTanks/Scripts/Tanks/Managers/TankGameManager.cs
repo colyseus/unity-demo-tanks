@@ -654,7 +654,7 @@ public class TankGameManager : MonoBehaviour
             uiController.ToggleMap();
         }
 
-        if (!IsOurTurn)
+        if (!IsOurTurn || _waitingForFirePath)
         {
             return;
         }
@@ -727,7 +727,8 @@ public class TankGameManager : MonoBehaviour
         ExampleVector3Obj barrelForward = new ExampleVector3Obj(tank.BarrelForward);
         ExampleVector3Obj barrelPosition = new ExampleVector3Obj(environmentBuilder.groundPieceRoot.InverseTransformPoint(tank.BarrelPosition));
 
-        ExampleManager.CustomServerMethod("getFirePath", new object[] { barrelForward, barrelPosition, tank.CannonPower });
+        ExampleManager.NetSend("fireWeapon", new FireWeaponMessage() { barrelForward = barrelForward, barrelPosition = barrelPosition, cannonPower = tank.CannonPower });
+        //ExampleManager.CustomServerMethod("getFirePath", new object[] { barrelForward, barrelPosition, tank.CannonPower });
 
         // Reset flag for waiting for fire path if the request times out
         Invoke("ResetWaitForFirePath", 5.0f);
