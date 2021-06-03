@@ -6,4 +6,5 @@ export class Weapon extends Schema {
     @type("number") chargeTime: number;
     @type("number") radius: number;
     @type("number") impactDamage: number;
+    @type("number") index: number;
 }

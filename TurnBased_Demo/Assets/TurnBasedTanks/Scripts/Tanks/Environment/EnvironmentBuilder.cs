@@ -111,7 +111,7 @@ public class EnvironmentBuilder : MonoBehaviour
 
         idx = index;
 
-        LSLog.LogImportant($"Get Grid Value At ({x}, {y}) = {(float)mapMatrix.GetByIndex(index)/*mapMatrix[index]*/} - Index = {index}");
+        //LSLog.LogImportant($"Get Grid Value At ({x}, {y}) = {(float)mapMatrix.GetByIndex(index)/*mapMatrix[index]*/} - Index = {index}");
 
         return (float)mapMatrix.GetByIndex(index); //mapMatrix[index];
     }
@@ -246,7 +246,7 @@ public class EnvironmentBuilder : MonoBehaviour
 
         Vector2 temp = groundPieceRoot.localPosition;
 
-        temp.x = map.Count / -2;
+        temp.x = /*map.Count*/ ExampleManager.Instance.Room.State.world.width / -2;
         groundPieceRoot.localPosition = temp;
 
         TankGameManager.Instance.ReportTanks(tanks[0], tanks[1]);

@@ -14,20 +14,23 @@ export const weaponList = [
         maxCharge: 5,
         chargeTime: 1,
         radius: 1,
-        impactDamage: 1
+        impactDamage: 1,
+        index: 0
     },
     {
         name: "Mid Range",
         maxCharge: 8,
         chargeTime: 2,
         radius: 1,
-        impactDamage: 1
+        impactDamage: 1,
+        index: 1
     },
     {
         name: "Long Range",
         maxCharge: 10,
         chargeTime: 5,
         radius: 1,
-        impactDamage: 1
+        impactDamage: 1,
+        index: 2
     }
 ]

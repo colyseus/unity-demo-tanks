@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using LucidSightTools;
+using Tanks;
 using UnityEngine;
 
 public class TankController : MonoBehaviour
@@ -55,7 +56,7 @@ public class TankController : MonoBehaviour
         }
     }
 
-    public WeaponModel ActiveWeaponData
+    public Weapon ActiveWeaponData
     {
         get
         {
@@ -144,11 +145,11 @@ public class TankController : MonoBehaviour
     {
         if (!canAct)
             return;
-
-        ExampleManager.CustomServerMethod("changeWeapon", new object[] { desIndex });
+        ExampleManager.NetSend("changeWeapon", desIndex);
+        //ExampleManager.CustomServerMethod("changeWeapon", new object[] { desIndex });
     }
 
-    public void UpdateSelectedWeapon(WeaponModel weapon)
+    public void UpdateSelectedWeapon(Weapon/*WeaponModel*/ weapon)
     {
         cannon.ChangeWeapon(weapon);
     }

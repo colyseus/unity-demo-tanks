@@ -80,6 +80,9 @@ public class ExampleRoomController
     public delegate void OnWorldChanged(List<DataChange> changes);
     public static event OnWorldChanged onWorldChanged;
 
+    public delegate void OnPlayerChange(int playerId, List<DataChange> changes);
+    public static event OnPlayerChange onPlayerChange;
+
     public delegate void OnReceivedFirePath(int player, int remainingAP, List<Vector3> firePath, DamageData damageData);
     public static event OnReceivedFirePath onReceivedFirePath;
 
@@ -260,7 +263,7 @@ public class ExampleRoomController
     public static event OnRoomStateChanged onRoomStateChanged;
     public static event OnBeginRoundCountDown onBeginRoundCountDown;
     public static event OnBeginRound onBeginRound;
-    public static event OnUserStateChanged OnCurrentUserStateChanged;
+    //public static event OnUserStateChanged OnCurrentUserStateChanged;
 
     /// <summary>
     ///     Set the dependencies.
@@ -450,7 +453,7 @@ public class ExampleRoomController
         });
         _room.OnMessage<FirePathMessage>("receiveFirePath", (message) => { onReceivedFirePath?.Invoke(message.playerNumber, message.remainingAP, message.firePath, message.damageData ); });
 
-        _room.OnMessage<SelectedWeaponUpdatedMessage>("selectedWeaponUpdated", (message) => { onSelectedWeaponUpdated?.Invoke(message.weapon);});
+        //_room.OnMessage<SelectedWeaponUpdatedMessage>("selectedWeaponUpdated", (message) => { onSelectedWeaponUpdated?.Invoke(message.weapon);});
 
         _room.OnMessage<PlayerJoinedMessage>("playerJoined", (message) => { onPlayerJoined?.Invoke(message.playerId, message.playerName); });
         
@@ -639,12 +642,16 @@ public class ExampleRoomController
             LSLog.LogImportant($"User.OnChange!", LSLog.LogColor.cyan);
             //user.updateHash = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
 
-            // If the change is for our current user then fire the event with the attributes that changed
-            if (ExampleManager.Instance.CurrentUser != null &&
-                string.Equals(ExampleManager.Instance.CurrentUser.sessionId, user.sessionId))
-            {
-                OnCurrentUserStateChanged?.Invoke(user/*.attributes*/);
-            }
+            //// If the change is for our current user then fire the event with the attributes that changed
+            //if (ExampleManager.Instance.CurrentUser != null &&
+            //    string.Equals(ExampleManager.Instance.CurrentUser.sessionId, user.sessionId))
+            //{
+            //    OnCurrentUserStateChanged?.Invoke(user/*.attributes*/);
+            //}
+            
+            LSLog.LogImportant($"Player Change - Player = {user.sessionId}/{user.playerId}/{user.name}", LSLog.LogColor.grey);
+
+            onPlayerChange?.Invoke((int)user.playerId, changes);
         };
     }
 

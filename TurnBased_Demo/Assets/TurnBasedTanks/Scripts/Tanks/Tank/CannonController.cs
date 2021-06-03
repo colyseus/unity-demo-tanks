@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Tanks;
 using UnityEngine;
 
 public class CannonController : MonoBehaviour
@@ -76,7 +77,7 @@ public class CannonController : MonoBehaviour
         }
     }
 
-    public WeaponModel ActiveWeaponData { get; private set; }
+    public Weapon ActiveWeaponData { get; private set; }
 
     private int currentWeapon = 0;
 
@@ -109,12 +110,12 @@ public class CannonController : MonoBehaviour
         return currentAimAngle;
     }
 
-    public void ChangeWeapon(WeaponModel weapon)
+    public void ChangeWeapon(Weapon weapon)
     {
         ActiveWeapon.trajectoryLine.positionCount = 0;
 
         ActiveWeaponData = weapon;
-        currentWeapon = Mathf.Clamp(weapon.index, 0, weapons.Length - 1);
+        currentWeapon = Mathf.Clamp((int)weapon.index, 0, weapons.Length - 1);
     }
 
     public void StartCharging()

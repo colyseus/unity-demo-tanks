@@ -75,14 +75,16 @@ public class TankGameManager : MonoBehaviour
         // Subscribe to events
         ExampleRoomController.onRoomStateChanged += OnRoomStateChanged;
         //ExampleRoomController.onInitialSetup += OnInitialSetup;
-        ExampleRoomController.onWorldChanged += OnWorldChanged;
         ExampleRoomController.onTankMoved += OnPlayerMove;
         ExampleRoomController.onReceivedFirePath += OnReceivedFirePath;
-        ExampleRoomController.onSelectedWeaponUpdated += OnSelectedWeaponUpdated;
+        //ExampleRoomController.onSelectedWeaponUpdated += OnSelectedWeaponUpdated;
         ExampleRoomController.onTurnCompleted += OnTurnCompleted;
         ExampleRoomController.onPlayerJoined += OnPlayerJoined;
         ExampleRoomController.onPlayerQuit += OnPlayerQuit;
         ExampleRoomController.onPlayerLeave += OnPlayerLeft;
+
+        ExampleRoomController.onWorldChanged += OnWorldChanged;
+        ExampleRoomController.onPlayerChange += OnPlayerUpdated;
     }
 
     void OnDisable()
@@ -92,11 +94,46 @@ public class TankGameManager : MonoBehaviour
         //ExampleRoomController.onInitialSetup -= OnInitialSetup;
         ExampleRoomController.onTankMoved -= OnPlayerMove;
         ExampleRoomController.onReceivedFirePath -= OnReceivedFirePath;
-        ExampleRoomController.onSelectedWeaponUpdated -= OnSelectedWeaponUpdated;
+        //ExampleRoomController.onSelectedWeaponUpdated -= OnSelectedWeaponUpdated;
         ExampleRoomController.onTurnCompleted -= OnTurnCompleted;
         ExampleRoomController.onPlayerJoined -= OnPlayerJoined;
         ExampleRoomController.onPlayerQuit -= OnPlayerQuit;
         ExampleRoomController.onPlayerLeave -= OnPlayerLeft;
+
+        ExampleRoomController.onWorldChanged -= OnWorldChanged;
+        ExampleRoomController.onPlayerChange -= OnPlayerUpdated;
+    }
+
+    private void OnPlayerUpdated(int playerId, List<DataChange> changes)
+    {
+        LSLog.LogImportant($"Player Updated - Player Id = {playerId}", LSLog.LogColor.grey);
+
+        for (int i = 0; i < changes.Count; i++)
+        {
+            LSLog.LogImportant($"\tField = {changes[i].Field} Prev = {changes[i].PreviousValue}  New = {changes[i].Value}", LSLog.LogColor.grey);
+            
+            UpdatePlayer(playerId, changes[i]);
+        }
+    }
+
+    private void UpdatePlayer(int playerId, DataChange change)
+    {
+        TankController tank = playerId == 0 ? playerOneTank : playerTwoTank;
+        TanksState state = ExampleManager.Instance.Room.State;
+
+        switch (change.Field)
+        {
+            case "currentWeapon":
+                Weapon weapon = (Weapon)state.weapons[(int)((float)change.Value)];
+                tank.UpdateSelectedWeapon(weapon);
+                break;
+            default:
+                LSLog.Log($"Unsupported update field - \"{change.Field}\"", LSLog.LogColor.yellow);
+
+                break;
+        }
+
+        UpdateUI(state);
     }
 
     /// <summary>
@@ -140,23 +177,39 @@ public class TankGameManager : MonoBehaviour
         uiController.ToggleOnlineIndicator(false);
     }
 
-    /// <summary>
-    /// Callback to handle the server response when we want to change our currently selected weapon
-    /// </summary>
-    /// <param name="selectedWeapon"></param>
-    private void OnSelectedWeaponUpdated(WeaponModel selectedWeapon)
+    private void SelectedWeaponUpdated(int playerId, int weaponIndex = 0)
     {
+        Weapon weapon = ExampleManager.Instance.Room.State.weapons[weaponIndex];
+
         if (OurPlayerID == 0)
         {
-            playerOneTank.UpdateSelectedWeapon(selectedWeapon);
+            playerOneTank.UpdateSelectedWeapon(weapon);
         }
         else
         {
-            playerTwoTank.UpdateSelectedWeapon(selectedWeapon);
+            playerTwoTank.UpdateSelectedWeapon(weapon);
         }
 
         UpdateUI(ExampleManager.Instance.Room.State);
     }
+
+    /// <summary>
+    /// Callback to handle the server response when we want to change our currently selected weapon
+    /// </summary>
+    /// <param name="selectedWeapon"></param>
+    //private void OnSelectedWeaponUpdated(WeaponModel selectedWeapon)
+    //{
+    //    if (OurPlayerID == 0)
+    //    {
+    //        playerOneTank.UpdateSelectedWeapon(selectedWeapon);
+    //    }
+    //    else
+    //    {
+    //        playerTwoTank.UpdateSelectedWeapon(selectedWeapon);
+    //    }
+
+    //    UpdateUI(ExampleManager.Instance.Room.State);
+    //}
 
     /// <summary>
     /// Callback to handle an inbound fire path
@@ -231,17 +284,16 @@ public class TankGameManager : MonoBehaviour
         LSLog.LogImportant($"World Changed!", LSLog.LogColor.lime);
         for (int i = 0; i < changes.Count; i++)
         {
-            LSLog.LogImportant($"\tField = {changes[i].Field}", LSLog.LogColor.lime);
+            //LSLog.LogImportant($"\tField = {changes[i].Field}", LSLog.LogColor.lime);
 
             if (string.Equals(changes[i].Field, "grid"))
             {
-                LSLog.LogImportant($"Update world grid! || {JsonUtility.ToJson(changes[i])}");
-                LSLog.Log($"World Grid - grid count = {ExampleManager.Instance.Room.State.world.grid.Count}");
+                //LSLog.LogImportant($"Update world grid! || {JsonUtility.ToJson(changes[i])}");
+                //LSLog.Log($"World Grid - grid count = {ExampleManager.Instance.Room.State.world.grid.Count}");
 
                 ReceiveWorldMap(ExampleManager.Instance.Room.State.world);
             }
 
-            //ExampleManager.Instance.Room.State.world.
         }
     }
 
@@ -275,6 +327,18 @@ public class TankGameManager : MonoBehaviour
         EndTurn();
     }
 
+    private Player GetChallengerPlayer(TanksState state)
+    {
+        int challengerId = OurPlayerID == 0 ? 1 : 0;
+
+        return state.players[challengerId];
+    }
+
+    private Player GetOurPlayer(TanksState state)
+    {
+        return state.players[OurPlayerID];
+    }
+
     private void InitialSetup(TanksState state)
     {
         LSLog.LogImportant($"Initial Setup", LSLog.LogColor.lime);
@@ -291,19 +355,24 @@ public class TankGameManager : MonoBehaviour
         });
 
         SetCurrentTurn((int)state.currentTurn);
-        
+
+        TankController ourTank = GetOurTank();
+
+        ourTank.UpdateSelectedWeapon(state.weapons[(int)GetOurPlayer(state).currentWeapon]);
+
         uiController.HideGameOverUI();
+        uiController.ToggleOnlineIndicator(GetChallengerPlayer(state).connected);
 
         UpdatePlayerNames(state);
-
+        UpdatePlayerHP(state);
         UpdateUI(state);
 
         _waitingForFirePath = false;
         fireChargeInProgress = false;
 
-        //StartTurn();
-
         uiController.ToggleLoadingCover(false);
+
+        StartTurn();
     }
 
     /// <summary>
@@ -332,20 +401,20 @@ public class TankGameManager : MonoBehaviour
 
         //SetCurrentTurn(playerTurn);
 
-        TankController ourTank = GetOurTank();
+        //TankController ourTank = GetOurTank();
 
-        ourTank.UpdateSelectedWeapon(currentWeapon);
+        //ourTank.UpdateSelectedWeapon(currentWeapon);
 
         // Set the AP for the active tank as received from the server
         GetTankForCurrentTurn().CurrentAP = currentAP;
         GetTankForCurrentTurn().ignoreAPReset = true;
 
         //uiController.HideGameOverUI();
-        uiController.ToggleOnlineIndicator(challengerOnline);
+        //uiController.ToggleOnlineIndicator(challengerOnline);
 
         //UpdatePlayerNames(playerNames);
-        UpdatePlayerHP(playerHP);
-        UpdateUI(ExampleManager.Instance.Room.State);
+        //UpdatePlayerHP(playerHP);
+        //UpdateUI(ExampleManager.Instance.Room.State);
 
         //_waitingForFirePath = false;
         //fireChargeInProgress = false;
@@ -397,39 +466,59 @@ public class TankGameManager : MonoBehaviour
 
     }
 
-    private void UpdatePlayerHP(int[] playerHP)
+    private void UpdatePlayerHP(TanksState state/*int[] playerHP*/)
     {
-        if (playerHP != null && playerHP.Length > 1)
+        if (OurPlayerID == 0)
         {
-            if (OurPlayerID == 0)
-            {
-                uiController.UpdateHitPoints(playerHP[0], true);
-                uiController.UpdateHitPoints(playerHP[1], false);
-            }
-            else
-            {
-                uiController.UpdateHitPoints(playerHP[1], true);
-                uiController.UpdateHitPoints(playerHP[0], false);
-            }
-
-            if (playerHP[0] == 0)
-            {
-                GameOver(1);
-            }
-            else if (playerHP[1] == 0)
-            {
-                GameOver(0);
-            }
+            uiController.UpdateHitPoints(/*playerHP*/(int)state.players[0].hp, true);
+            uiController.UpdateHitPoints(/*playerHP*/(int)state.players[1].hp, false);
         }
-        else if (playerHP != null && playerHP.Length > 0)
+        else
         {
-            uiController.UpdateHitPoints(playerHP[0], true);
-
-            if (playerHP[0] == 0)
-            {
-                GameOver(1);
-            }
+            uiController.UpdateHitPoints(/*playerHP*/(int)state.players[1].hp, true);
+            uiController.UpdateHitPoints(/*playerHP*/(int)state.players[0].hp, false);
         }
+
+        if (/*playerHP*/(int)state.players[0].hp == 0)
+        {
+            GameOver(1);
+        }
+        else if (/*playerHP*/(int)state.players[1].hp == 0)
+        {
+            GameOver(0);
+        }
+
+        //if (playerHP != null && playerHP.Length > 1)
+        //{
+        //    if (OurPlayerID == 0)
+        //    {
+        //        uiController.UpdateHitPoints(playerHP[0], true);
+        //        uiController.UpdateHitPoints(playerHP[1], false);
+        //    }
+        //    else
+        //    {
+        //        uiController.UpdateHitPoints(playerHP[1], true);
+        //        uiController.UpdateHitPoints(playerHP[0], false);
+        //    }
+
+        //    if (playerHP[0] == 0)
+        //    {
+        //        GameOver(1);
+        //    }
+        //    else if (playerHP[1] == 0)
+        //    {
+        //        GameOver(0);
+        //    }
+        //}
+        //else if (playerHP != null && playerHP.Length > 0)
+        //{
+        //    uiController.UpdateHitPoints(playerHP[0], true);
+
+        //    if (playerHP[0] == 0)
+        //    {
+        //        GameOver(1);
+        //    }
+        //}
 
     }
 
@@ -647,7 +736,7 @@ public class TankGameManager : MonoBehaviour
 
         attributeUpdate.Add("aimAngle", aimAngle.ToString());
 
-        ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.CurrentUser.sessionId, attributesToSet = attributeUpdate });
+        ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.Room.SessionId/*CurrentUser.sessionId*/, attributesToSet = attributeUpdate });
     }
 
     /// <summary>
@@ -702,7 +791,7 @@ public class TankGameManager : MonoBehaviour
             return null;
         }
 
-        return (Weapon)state.weapons[player.currentWeapon];
+        return (Weapon)state.weapons[(int)player.currentWeapon];
     }
 
     private Player GetCurrentTurnPlayer(TanksState state)

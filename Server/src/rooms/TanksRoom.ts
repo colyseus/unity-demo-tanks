@@ -49,6 +49,109 @@ export class TanksRoom extends Room<TanksState> {
         this.environmentController = new EnvironmentBuilder(this.state);
         this.resetForNewRound();
 
+        this.registerMessageHandlers();
+
+        // Set the Simulation Interval callback
+        this.setSimulationInterval(dt => this.gameLoop(dt));
+    }
+
+    // Callback when a client has joined the room
+    onJoin(client: Client, options: any) {
+        console.info(`Client joined! - ${client.sessionId} ***`); console.log(options);
+
+        //
+        // FIXME: (assign playerId based on first "connected=false" player within state.players)
+        //
+        // If "creator" leaves the room while an opponent is still connected,
+        // when a next player joins, he's going to have the same "playerId" as
+        // the existing player.
+        // 
+        const username = options["joiningId"] || options["creatorId"];
+
+        const isCreator = this.state.creatorId === username; // (this.clients.length === 1);
+
+        logger.info(`*** On Join - Username = ${username} - Is Creator = ${isCreator} ***`);
+
+        // attach custom data to the client.
+        client.userData = {
+            playerId: (isCreator) ? 0 : 1
+        };
+
+        const player: Player = this.state.players[client.userData.playerId];
+
+        let playerSetting = {};
+
+        if(isCreator) {
+            // Just update the sessionId of the creator player
+            playerSetting = {
+                sessionId: client.sessionId
+            }
+        }
+        else {
+            // Update relevant data for challenger player
+            playerSetting = {
+                sessionId: client.sessionId,
+                name: username
+            }
+        }
+
+        // Assign data to be synchronized
+        player.assign(playerSetting);
+
+        // Set team0 / team1 key on room's metadata
+        this.setMetadata({
+            [`team${player.playerId}`]: client.sessionId
+        });
+    }
+
+    /**
+     * Run the game loop
+     * @param deltaTime Delta time of the server
+     */
+    gameLoop(deltaTime: number) {
+        this.serverTime += deltaTime;
+
+        const deltaTimeSeconds = deltaTime / 1000;
+
+        // Update the game state
+        switch (this.state.gameState) {
+            case GameState.SimulateRound:
+                // Update the counter for player movement
+                if (this.state.isPlayerMoving == true) {
+                    this.currPlayerMoveWait += deltaTimeSeconds;
+
+                    if (this.currPlayerMoveWait >= GameRules.MovementTime) {
+                        this.state.isPlayerMoving = false;
+                        this.currPlayerMoveWait = 0;
+                    }
+                }
+                break;
+
+            case GameState.EndRound:
+                // Check if all the users are ready for a rematch
+                let playersReady = this.checkForRematch();
+
+                // Return out if not all of the players are ready yet.
+                if (playersReady === false) { return; }
+
+                this.state.statusMessage = "";
+
+                this.resetForNewRound();
+
+                // Begin a new round
+                this.state.moveToState(GameState.SimulateRound);
+
+                break;
+
+            default:
+                console.error("Unknown Game State - " + this.state.gameState);
+                break;
+        }
+
+    }
+
+    private registerMessageHandlers() {
+
         // Set the callback for the "ping" message for tracking server-client latency
         this.onMessage("ping", (client) => {
             client.send(0, { serverTime: this.serverTime });
@@ -71,7 +174,7 @@ export class TanksRoom extends Room<TanksState> {
             this.state.nextTurn();
         });
 
-        this.onMessage("changeWeapon", (client, message) => {
+        this.onMessage("changeWeapon", (client: Client, message) => {
             // Check if the player can do the action
             if (this.canDoAction(client.userData.playerId) == false) {
                 return;
@@ -80,7 +183,7 @@ export class TanksRoom extends Room<TanksState> {
             this.state.switchPlayerWeapon(client.userData.playerId, message);
         });
 
-        this.onMessage("movePlayer", (client, direction) => {
+        this.onMessage("movePlayer", (client: Client, direction) => {
             // Skip if the player cannot do the action
             if (this.canDoAction(client.userData.playerId) === false) { return; }
 
@@ -183,104 +286,6 @@ export class TanksRoom extends Room<TanksState> {
             // TODO CLIENT-SIDE:
             // Call room.leave() directly - onLeave() is going to be triggered with "consented" = true
         });
-
-        // Set the Simulation Interval callback
-        this.setSimulationInterval(dt => this.gameLoop(dt));
-    }
-
-    // Callback when a client has joined the room
-    onJoin(client: Client, options: any) {
-        console.info(`Client joined! - ${client.sessionId} ***`); console.log(options);
-
-        //
-        // FIXME: (assign playerId based on first "connected=false" player within state.players)
-        //
-        // If "creator" leaves the room while an opponent is still connected,
-        // when a next player joins, he's going to have the same "playerId" as
-        // the existing player.
-        // 
-        const username = options["joiningId"] || options["creatorId"];
-
-        const isCreator = this.state.creatorId === username; // (this.clients.length === 1);
-
-        logger.info(`*** On Join - Username = ${username} - Is Creator = ${isCreator} ***`);
-
-        // attach custom data to the client.
-        client.userData = {
-            playerId: (isCreator) ? 0 : 1
-        };
-
-        const player: Player = this.state.players[client.userData.playerId];
-
-        let playerSetting = {};
-
-        if(isCreator) {
-            // Just update the sessionId of the creator player
-            playerSetting = {
-                sessionId: client.sessionId
-            }
-        }
-        else {
-            // Update relevant data for challenger player
-            playerSetting = {
-                sessionId: client.sessionId,
-                name: username
-            }
-        }
-
-        // Assign data to be synchronized
-        player.assign(playerSetting);
-
-        // Set team0 / team1 key on room's metadata
-        this.setMetadata({
-            [`team${player.playerId}`]: client.sessionId
-        });
-    }
-
-    /**
-     * Run the game loop
-     * @param deltaTime Delta time of the server
-     */
-    gameLoop(deltaTime: number) {
-        this.serverTime += deltaTime;
-
-        const deltaTimeSeconds = deltaTime / 1000;
-
-        // Update the game state
-        switch (this.state.gameState) {
-            case GameState.SimulateRound:
-                // Update the counter for player movement
-                if (this.state.isPlayerMoving == true) {
-                    this.currPlayerMoveWait += deltaTimeSeconds;
-
-                    if (this.currPlayerMoveWait >= GameRules.MovementTime) {
-                        this.state.isPlayerMoving = false;
-                        this.currPlayerMoveWait = 0;
-                    }
-                }
-                break;
-
-            case GameState.EndRound:
-                // Check if all the users are ready for a rematch
-                let playersReady = this.checkForRematch();
-
-                // Return out if not all of the players are ready yet.
-                if (playersReady === false) { return; }
-
-                this.state.statusMessage = "";
-
-                this.resetForNewRound();
-
-                // Begin a new round
-                this.state.moveToState(GameState.SimulateRound);
-
-                break;
-
-            default:
-                console.error("Unknown Game State - " + this.state.gameState);
-                break;
-        }
-
     }
 
     /**
