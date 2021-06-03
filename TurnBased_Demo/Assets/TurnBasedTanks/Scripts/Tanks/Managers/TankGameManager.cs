@@ -543,18 +543,15 @@ public class TankGameManager : MonoBehaviour
     /// Callback to handle player movement updates
     /// </summary>
     /// <param name="player">The turn Id of the player that has moved</param>
-    /// <param name="remainingAP">The remaining Action Points of the player that has moved</param>
     /// <param name="newCoords">The new position of the player that has moved</param>
-    private void OnPlayerMove(int player, int remainingAP, Tanks.Vector2 newCoords)
+    private void OnPlayerMove(int player, Tanks.Vector2 newCoords)
     {
         TankController tank = player == 0 ? playerOneTank : playerTwoTank;
-        tank.CurrentAP = remainingAP;
         tank.Move(new EnvironmentBuilder.MapCoordinates((int)newCoords.x, (int)newCoords.y), player == 0);
 
         Vector3 newWorldPos = environmentBuilder.CoordinateToWorldPosition(tank.mapCoords);
         FocusOnPosition(newWorldPos, false, null);
         UpdateUI(ExampleManager.Instance.Room.State);
-
     }
 
     /// <summary>
@@ -853,7 +850,7 @@ public class TankGameManager : MonoBehaviour
     /// <param name="direction"></param>
     public void AttemptMove(int direction)
     {
-        ExampleManager.CustomServerMethod("movePlayer", new object[] {direction});
+        ExampleManager.NetSend("movePlayer", direction);
     }
 
     /// <summary>

@@ -21,18 +21,16 @@ export class EnvironmentBuilder
 {
     constructor (private state: TanksState) {}
     
-    localGrid: number[];
+    localGrid: number[]; // Locally cached version of game environment used to track player movement as well as damage done to the environment
 
     //Map Generation code
     //=======================================================================================================
     public GenerateEnvironment(width: number, height: number){
 
-        //console.log(`*** Environment Controller - Generate Environment - (${width},${height})`);
-
         this.state.world.width = width;
         this.state.world.height = height;
 
-        this.state.world.grid = new ArraySchema<number>(width * height);
+        this.state.world.grid = new ArraySchema<number>();
 
         this.localGrid = new Array(width * height);
 
@@ -53,7 +51,7 @@ export class EnvironmentBuilder
             for (let y = 0; y < height; ++y) {
                 let val: number = (y < noiseHeight) ? MapIconValues.GROUND : MapIconValues.EMPTY;
                 
-                this.SetGridValueAt(x, y, val);
+                this.SetGridValueAt(x, y, val, true);
             }
         }
 
@@ -69,9 +67,19 @@ export class EnvironmentBuilder
     get mapWidth () { return this.state.world.width; }
     get mapHeight () { return this.state.world.height; }
 
-    private SetGridValueAt(x: number, y: number, value: number) {
+    /**
+     * Sets the value and the given grid coordinate
+     * @param x 
+     * @param y 
+     * @param value 
+     * @param syncWorld Should the world schema be updated? True will cause clients to rebuild their world environment
+     */
+    private SetGridValueAt(x: number, y: number, value: number, syncWorld: boolean = false) {
 
-        this.state.world.setGridValueAt(x, y, value);
+        if(syncWorld) {
+            this.state.world.setGridValueAt(x, y, value);
+        }
+
         this.SetLocalGridValue(x, y, value);
     }
 
@@ -97,25 +105,21 @@ export class EnvironmentBuilder
 
         for (let y = 0; y < height && (!playerOnePlaced || !playerTwoPlaced); ++y)
         {
-            let gridOneVal: number = /*this.state.world.getGridValueAt(oneX, y)*/this.GetLocalGridValueAt(oneX, y);
-            let gridTwoVal: number = /*this.state.world.getGridValueAt(twoX, y)*/this.GetLocalGridValueAt(twoX, y);
+            let gridOneVal: number = this.GetLocalGridValueAt(oneX, y);
+            let gridTwoVal: number = this.GetLocalGridValueAt(twoX, y);
 
             if (gridOneVal === MapIconValues.EMPTY && !playerOnePlaced)
             {
-                //logger.silly(`*** Place Player One at (${oneX}, ${y}) ***`);
-
                 //We have nothing in this square
-                this.SetGridValueAt(oneX, y, MapIconValues.PLAYER_1);
+                this.SetGridValueAt(oneX, y, MapIconValues.PLAYER_1, true);
                 playerOnePlaced = true;
                 this.SetPlayerPosition(0, new Vector2(oneX, y));
             }
 
             if (gridTwoVal === MapIconValues.EMPTY && !playerTwoPlaced)
             {
-                //logger.silly(`*** Place Player Two at (${twoX}, ${y}) ***`);
-
                 //We have nothing in this square
-                this.SetGridValueAt(twoX, y, MapIconValues.PLAYER_2);
+                this.SetGridValueAt(twoX, y, MapIconValues.PLAYER_2, true);
                 playerTwoPlaced = true;
                 this.SetPlayerPosition(1, new Vector2(twoX, y));
             }
@@ -135,7 +139,7 @@ export class EnvironmentBuilder
         return this.state.players[playerId].coords;
     }
 
-    public SetPlayerPosition(playerId: number, coords: Vector2) {
+    public SetPlayerPosition(playerId: number, coords: Vector2Like) {
         const player = this.state.players[playerId];
         const previousPos = this.GetPlayerPosition(playerId);
 
@@ -160,8 +164,6 @@ export class EnvironmentBuilder
             if(foundTermination)
                 break;
             
-            //console.log(`*** Orig Path ${i} - (${origPath[i].x}, ${origPath[i].y})`);
-
             let coords: Vector2 = this.ClientPositionToMapCoordinates(origPath[i]);
             if (coords == null)
             {
@@ -197,7 +199,7 @@ export class EnvironmentBuilder
             }
         }
 
-        return updatedPath;// new CannonController.CannonFirePath(updatedPath.ToArray());
+        return updatedPath;
     }
 
     public ClientPositionToMapCoordinates(clientPos: Vector3) : Vector2
@@ -240,6 +242,7 @@ export class EnvironmentBuilder
         }
         
         let mapValue = this.GetLocalGridValueAt(newX, newY);
+
         if (mapValue === MapIconValues.EMPTY)
         {
             newY = this.FindNextSafeGridPos(newX, newY);
@@ -249,6 +252,7 @@ export class EnvironmentBuilder
             //Don't pass the top of the map
             let yVal = Math.min(newY + 1, this.state.world.height);
             let mapVal = this.GetLocalGridValueAt(newX, yVal);
+
             if(mapVal === MapIconValues.EMPTY)
             {
                 newY = yVal;
@@ -293,6 +297,7 @@ export class EnvironmentBuilder
         while(!groundFound)
         {
             let mapVal = this.GetLocalGridValueAt(startX, yVal);
+            
             if(mapVal === MapIconValues.EMPTY)
             {
                 //This space is empty, check lower

@@ -5,6 +5,7 @@ import { EnvironmentBuilder } from "./tanks/EnvironmentController";
 import { GameRules } from "./tanks/rules";
 import { Vector3 } from "three";
 import logger from "../helpers/logger";
+import { Vector2 } from "./schema/Vector2";
 
 export class TanksRoom extends Room<TanksState> {
     
@@ -206,12 +207,17 @@ export class TanksRoom extends Room<TanksState> {
             this.state.isPlayerMoving = true; // Update the player moving flag to true
 
             const nextPosition = this.environmentController.GetAvailableSpace(direction, player.coords);
-            const hasMoved: boolean = player.coords.x !== nextPosition.x;
+            const canMove: boolean = player.coords.x !== nextPosition.x;
 
             // Attempt to move the player
-            if (hasMoved) {
+            if (canMove) {
+
+                this.environmentController.SetPlayerPosition(player.playerId, nextPosition);
+
                 // update player coords
-                player.coords.assign(nextPosition);
+                //player.coords.assign(nextPosition);
+
+                // Update world
 
                 // Consume AP
                 player.consumeActionPoints(GameRules.MovementActionPointCost);

@@ -9,6 +9,7 @@ using LucidSightTools;
 using NativeWebSocket;
 using UnityEngine;
 using Tanks;
+using Vector2 = UnityEngine.Vector2;
 
 /// <summary>
 ///     Manages the rooms of a server connection.
@@ -101,7 +102,7 @@ public class ExampleRoomController
     public delegate void OnTurnCompleted(bool wasSkip);
     public static OnTurnCompleted onTurnCompleted;
 
-    public delegate void OnTankMoved(int player, int remainingAP, Tanks.Vector2 newCoords);
+    public delegate void OnTankMoved(int player, Tanks.Vector2 newCoords);
     public static OnTankMoved onTankMoved;
 
     //==========================
@@ -447,10 +448,10 @@ public class ExampleRoomController
         {
             onTurnCompleted?.Invoke(message.wasSkip);
         });
-        _room.OnMessage<TankMoveMessage>("tankMoved", (message) =>
-        {
-            onTankMoved?.Invoke(message.playerNumber, message.remainingAP, message.newCoords);
-        });
+        //_room.OnMessage<TankMoveMessage>("tankMoved", (message) =>
+        //{
+        //    onTankMoved?.Invoke(message.playerNumber, message.remainingAP, message.newCoords);
+        //});
         _room.OnMessage<FirePathMessage>("receiveFirePath", (message) => { onReceivedFirePath?.Invoke(message.playerNumber, message.remainingAP, message.firePath, message.damageData ); });
 
         //_room.OnMessage<SelectedWeaponUpdatedMessage>("selectedWeaponUpdated", (message) => { onSelectedWeaponUpdated?.Invoke(message.weapon);});
@@ -462,9 +463,9 @@ public class ExampleRoomController
         _room.OnMessage<ExampleCustomMethodMessage>("onPlayerLeave", (message) => {onPlayerLeave?.Invoke();});
         //========================
         
-        _room.State.players/*networkedUsers*/.OnAdd += OnUserAdd;
-        _room.State.players/*networkedUsers*/.OnRemove += OnUserRemove;
-
+        _room.State.players.OnAdd += OnUserAdd;
+        _room.State.players.OnRemove += OnUserRemove;
+        
         _room.State.TriggerAll();
         //========================
 
@@ -635,6 +636,25 @@ public class ExampleRoomController
 
         // Add "player" to map of players
         _users.Add(key, user);
+
+        user.coords.OnChange += coordChanges =>
+        {
+            LSLog.LogImportant($"User Coord Changed!", LSLog.LogColor.lightblue);
+
+            for (int i = 0; i < coordChanges.Count; i++)
+            {
+                LSLog.LogImportant($"\tField = {coordChanges[i].Field}  Value = {coordChanges[i].Value}", LSLog.LogColor.lightblue);
+                switch (coordChanges[i].Field)
+                {
+                    case "x":
+                        break;
+                    case "y":
+                        break;
+                }
+            }
+
+            onTankMoved?.Invoke((int)user.playerId, user.coords);
+        };
 
         // On entity update...
         user.OnChange += changes =>
