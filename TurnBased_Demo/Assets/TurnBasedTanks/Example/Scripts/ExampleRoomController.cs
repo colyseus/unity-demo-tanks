@@ -632,27 +632,13 @@ public class ExampleRoomController
     /// <param name="key">The user key</param>
     private void OnUserAdd(int key, Tanks.Player user)
     {
-        LSLog.LogImportant($"user [{user.__refId} | {user.sessionId/*id*/} | key {key}] Joined");
+        LSLog.LogImportant($"user [{user.__refId} | {user.sessionId} | key {key}] Joined");
 
         // Add "player" to map of players
         _users.Add(key, user);
 
         user.coords.OnChange += coordChanges =>
         {
-            LSLog.LogImportant($"User Coord Changed!", LSLog.LogColor.lightblue);
-
-            for (int i = 0; i < coordChanges.Count; i++)
-            {
-                LSLog.LogImportant($"\tField = {coordChanges[i].Field}  Value = {coordChanges[i].Value}", LSLog.LogColor.lightblue);
-                switch (coordChanges[i].Field)
-                {
-                    case "x":
-                        break;
-                    case "y":
-                        break;
-                }
-            }
-
             onTankMoved?.Invoke((int)user.playerId, user.coords);
         };
 

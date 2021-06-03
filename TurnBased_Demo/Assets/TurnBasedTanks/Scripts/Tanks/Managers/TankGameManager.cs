@@ -139,6 +139,22 @@ public class TankGameManager : MonoBehaviour
                     uiController.ToggleOnlineIndicator((bool)change.Value);
                 }
                 break;
+            case "name":
+
+                string updatedName = (string)change.Value;
+
+                if (OurPlayerID == playerId)
+                {
+                    OurPlayerName = updatedName;
+                }
+                else
+                {
+                    EnemyName = updatedName;
+                }
+
+                uiController.UpdatePlayerNames(OurPlayerName, EnemyName);
+
+                break;
             default:
                 LSLog.Log($"Unsupported update field - \"{change.Field}\"", LSLog.LogColor.yellow);
 
