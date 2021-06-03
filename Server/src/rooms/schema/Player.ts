@@ -18,6 +18,7 @@ export class Player extends Schema {
     @type("number") hp: number;
     @type(Vector2) coords = new Vector2();
     @type("number") currentWeapon: number = 0;
+    @type("number") aimAngle: number;
 
     // movement
     @type("number") currentMovement: number;

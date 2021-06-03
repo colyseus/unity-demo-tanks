@@ -127,6 +127,18 @@ public class TankGameManager : MonoBehaviour
                 Weapon weapon = (Weapon)state.weapons[(int)((float)change.Value)];
                 tank.UpdateSelectedWeapon(weapon);
                 break;
+            case "aimAngle":
+                if (playerId != OurPlayerID)
+                {
+                    tank.SetAim((float)change.Value);
+                }
+                break;
+            case "connected":
+                if (playerId != OurPlayerID)
+                {
+                    uiController.ToggleOnlineIndicator((bool)change.Value);
+                }
+                break;
             default:
                 LSLog.Log($"Unsupported update field - \"{change.Field}\"", LSLog.LogColor.yellow);
 
@@ -732,11 +744,13 @@ public class TankGameManager : MonoBehaviour
     /// <param name="aimAngle"></param>
     private void SendAimAngle(float aimAngle)
     {
-        attributeUpdate.Clear();
+        //attributeUpdate.Clear();
 
-        attributeUpdate.Add("aimAngle", aimAngle.ToString());
+        //attributeUpdate.Add("aimAngle", aimAngle.ToString());
 
-        ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.Room.SessionId/*CurrentUser.sessionId*/, attributesToSet = attributeUpdate });
+        ExampleManager.NetSend("setAimAngle", aimAngle);
+
+        //ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.Room.SessionId/*CurrentUser.sessionId*/, attributesToSet = attributeUpdate });
     }
 
     /// <summary>

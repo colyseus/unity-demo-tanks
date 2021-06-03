@@ -84,14 +84,16 @@ export class TanksRoom extends Room<TanksState> {
         if(isCreator) {
             // Just update the sessionId of the creator player
             playerSetting = {
-                sessionId: client.sessionId
+                sessionId: client.sessionId,
+                connected: true
             }
         }
         else {
             // Update relevant data for challenger player
             playerSetting = {
                 sessionId: client.sessionId,
-                name: username
+                name: username,
+                connected: true
             }
         }
 
@@ -181,6 +183,15 @@ export class TanksRoom extends Room<TanksState> {
             }
 
             this.state.switchPlayerWeapon(client.userData.playerId, message);
+        });
+
+        this.onMessage("setAimAngle", (client: Client, message) => {
+            // Check if the player can do the action
+            if (this.canDoAction(client.userData.playerId) == false) {
+                return;
+            }
+
+            this.state.setAimAngle(client.userData.playerId, message);
         });
 
         this.onMessage("movePlayer", (client: Client, direction) => {

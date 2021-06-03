@@ -30,16 +30,19 @@ namespace Tanks {
 		[Type(6, "number")]
 		public float currentWeapon = default(float);
 
-		[Type(7, "number")]
+        [Type(7, "number")]
+        public float aimAngle = default(float);
+
+        [Type(8, "number")]
 		public float currentMovement = default(float);
 
-		[Type(8, "number")]
+		[Type(9, "number")]
 		public float currentActionPoints = default(float);
 
-		[Type(9, "number")]
+		[Type(10, "number")]
 		public float timestamp = default(float);
 
-		[Type(10, "boolean")]
+		[Type(11, "boolean")]
 		public bool connected = default(bool);
 	}
 }

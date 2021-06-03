@@ -90,6 +90,12 @@ export class TanksState extends Schema {
         }
     }
 
+    setAimAngle(playerId: number, aimAngle: number) {
+        const player = this.players[playerId];
+
+        player.aimAngle = aimAngle;
+    }
+
     getActiveWeapon(playerId: number) {
         const player = this.players[playerId];
         return this.weapons[player.currentWeapon] || this.weapons[0]; // fallback to weapons[0] 
