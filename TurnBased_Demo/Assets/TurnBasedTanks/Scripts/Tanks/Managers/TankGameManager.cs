@@ -706,13 +706,13 @@ public class TankGameManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space))
         {
             //Skip remainder of turn
-            ExampleManager.CustomServerMethod("skipTurn", new object[] {});
+            ExampleManager.NetSend("skipTurn");
         }
 
-        if (updateUI)
-        {
-            UpdateUI(ExampleManager.Instance.Room.State);
-        }
+        //if (updateUI)
+        //{
+        //    UpdateUI(ExampleManager.Instance.Room.State);
+        //}
     }
 
     /// <summary>
