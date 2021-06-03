@@ -126,6 +126,11 @@ export class TanksRoom extends Room<TanksState> {
                     if (this.currPlayerMoveWait >= GameRules.MovementTime) {
                         this.state.isPlayerMoving = false;
                         this.currPlayerMoveWait = 0;
+                        
+                        // Check if the player has used up all their Action Points and end their turn if they have
+                        if (this.state.getCurrentTurnPlayer().currentActionPoints <= 0) {
+                            this.state.nextTurn();
+                        }
                     }
                 }
                 break;
@@ -222,10 +227,6 @@ export class TanksRoom extends Room<TanksState> {
                 // Consume AP
                 player.consumeActionPoints(GameRules.MovementActionPointCost);
 
-                // Check if the player has used up all their Action Points and end their turn if they have
-                if (player.currentActionPoints <= 0) {
-                    this.state.nextTurn();
-                }
             }
         });
 

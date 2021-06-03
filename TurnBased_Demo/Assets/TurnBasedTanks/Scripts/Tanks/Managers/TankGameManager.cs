@@ -265,46 +265,28 @@ public class TankGameManager : MonoBehaviour
     /// Callback for the room state change
     /// </summary>
     /// <param name="attributes"></param>
-    private void OnRoomStateChanged(TanksState state/*Colyseus.Schema.MapSchema<string> attributes*/, bool isFirstState)
+    private void OnRoomStateChanged(TanksState state, bool isFirstState)
     {
+        LSLog.LogImportant($"On Room State Changed - Is First State = {isFirstState}", LSLog.LogColor.yellow);
+
         if (isFirstState)
         {// First state update; run initial setup
             
             InitialSetup(state);
         }
-
-        if (ExampleManager.Instance.CurrentUser != null)
-        {
-            /*ExampleManager.Instance.Room.State.networkedUsers*/state.players.ForEach((/*str, */user) =>
-            {
-                if (string.Equals(user.sessionId, ExampleManager.Instance.CurrentUser.sessionId))
-                {// Skip ourselves
-                    return;
-                }
-
-                LSLog.LogImportant($"Aim Angle and Turn Id Not Implemented", LSLog.LogColor.yellow);
-
-                //if (user.attributes != null && user.attributes.ContainsKey("aimAngle") && user.attributes.ContainsKey("turnId"))
-                //{
-                //    TankController tank = null;
-                //    if (int.TryParse(user.attributes["turnId"], out int turnId))
-                //    {
-                //        tank = turnId == 0 ? playerOneTank : playerTwoTank;
-                //    }
-
-                //    if (tank && float.TryParse(user.attributes["aimAngle"], out float angle))
-                //    {
-                //        tank.SetAim(angle);
-                //    }
-                //}
-            });
-        }
-
+        
         GeneralMessage = state.statusMessage;
-        //if (attributes.ContainsKey("generalMessage"))
-        //{
-        //    GeneralMessage = attributes["generalMessage"];
-        //}
+
+        UpdateUI(state);
+
+        if (!isFirstState && (int)CurrentTurn != (int)state.currentTurn)
+        {
+            LSLog.LogImportant($"Turn Changed! - {state.currentTurn}", LSLog.LogColor.yellow);
+
+            SetCurrentTurn((int)state.currentTurn);
+
+            StartTurn();
+        }
     }
 
     private void OnWorldChanged(List<DataChange> changes)
@@ -393,7 +375,7 @@ public class TankGameManager : MonoBehaviour
 
         UpdatePlayerNames(state);
         UpdatePlayerHP(state);
-        UpdateUI(state);
+        //UpdateUI(state);
 
         _waitingForFirePath = false;
         fireChargeInProgress = false;

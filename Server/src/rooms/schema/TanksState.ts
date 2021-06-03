@@ -66,6 +66,8 @@ export class TanksState extends Schema {
     nextTurn() {
         this.turnNumber++;
 
+        this.currentTurn = this.currentTurn == 0 ? 1 : 0;
+
         // reset player actions
         this.players.forEach((player) => player.resetActions());
     }
@@ -99,6 +101,10 @@ export class TanksState extends Schema {
     getActiveWeapon(playerId: number) {
         const player = this.players[playerId];
         return this.weapons[player.currentWeapon] || this.weapons[0]; // fallback to weapons[0] 
+    }
+
+    getCurrentTurnPlayer(): Player {
+        return this.players[this.currentTurn];
     }
 
     // FIXME: this method could be extracted inside Environment class

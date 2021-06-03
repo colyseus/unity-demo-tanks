@@ -699,8 +699,7 @@ public class ExampleRoomController
     private static void OnStateChangeHandler(Tanks.TanksState state, bool isFirstState)
     {
         // Setup room first state
-        LSLog.LogImportant($"Room State has been updated! - {isFirstState}");
-        onRoomStateChanged?.Invoke(state/*.attributes*/, isFirstState);
+        onRoomStateChanged?.Invoke(state, isFirstState);
     }
 
     /// <summary>
