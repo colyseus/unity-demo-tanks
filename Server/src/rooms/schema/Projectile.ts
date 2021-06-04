@@ -6,8 +6,8 @@ import logger from "../../helpers/logger";
 
 export class Projectile extends Schema {
     
-    @type("string") key: string;
     // in-game properties
+    @type("string") key: string;
     @type(Vector2) coords = new Vector2();
 
     playerId: number;
@@ -40,7 +40,7 @@ export class Projectile extends Schema {
 
         let currPos: Vector_2 = this.vector2Position();
 
-        let newPos = this.vector2Helper.lerpVectors(currPos, currTargetPos, 25 * deltaTime);
+        let newPos = this.vector2Helper.lerpVectors(currPos, currTargetPos, GameRules.ProjectileSpeed * deltaTime);
 
         this.coords.assign({x: newPos.x, y: newPos.y});
 
@@ -49,8 +49,6 @@ export class Projectile extends Schema {
             this.currentPathIndex++;
             
             if(this.currentPathIndex >= this.projectilePath.length) {
-
-                logger.error(`*** Projectile go BOOM! ***`);
 
                 if(this.onComplete) {
                     this.onComplete(this);

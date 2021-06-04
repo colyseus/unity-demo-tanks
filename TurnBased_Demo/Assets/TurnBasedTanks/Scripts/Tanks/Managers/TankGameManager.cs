@@ -48,8 +48,6 @@ public class TankGameManager : MonoBehaviour
 
     private Dictionary<Projectile, ProjectileBase> _projectileObjects = new Dictionary<Projectile, ProjectileBase>();
 
-    private bool _waitingForFirePath = false;
-
     public bool IsOurTurn
     {
         get
@@ -216,19 +214,15 @@ public class TankGameManager : MonoBehaviour
                 uiController.UpdatePlayerNames(OurPlayerName, EnemyName);
 
                 break;
+            case "currentActionPoints":
+                tank.CurrentAP = (int) ((float) change.Value);
+                break;
             case "hp":
                 UpdatePlayerHP(state);
 
                 if ((float) change.Value == 0)
                 {
-                    if (playerId == 0)
-                    {
-                        playerOneTank.gameObject.SetActive(false);
-                    }
-                    else
-                    {
-                        playerTwoTank.gameObject.SetActive(false);
-                    }
+                    tank.gameObject.SetActive(false);
                 }
 
                 break;
@@ -452,9 +446,7 @@ public class TankGameManager : MonoBehaviour
 
         UpdatePlayerNames(state);
         UpdatePlayerHP(state);
-        //UpdateUI(state);
-
-        _waitingForFirePath = false;
+        
         fireChargeInProgress = false;
 
         uiController.ToggleLoadingCover(false);
@@ -682,7 +674,7 @@ public class TankGameManager : MonoBehaviour
             uiController.ToggleMap();
         }
 
-        if (!IsOurTurn || _waitingForFirePath)
+        if (!IsOurTurn)
         {
             return;
         }
@@ -691,7 +683,7 @@ public class TankGameManager : MonoBehaviour
         if (activeTank == null || activeTank.CanAct() == false)
             return;
 
-        bool updateUI = activeTank.CheckHotkeys();
+        activeTank.CheckHotkeys();
 
         if (fireChargeInProgress == false && Input.GetAxisRaw("Horizontal") != 0.0f)
         {
@@ -708,7 +700,7 @@ public class TankGameManager : MonoBehaviour
             }
         }
 
-        if (Input.GetMouseButtonDown(0))
+        if (GetCurrentTurnAP(ExampleManager.Instance.Room.State) >= GameRules.FiringAPCost && Input.GetMouseButtonDown(0))
         {
             fireChargeInProgress = true;
             GetTankForCurrentTurn().StartChargeCannon();
@@ -722,9 +714,9 @@ public class TankGameManager : MonoBehaviour
 
         if (Input.GetMouseButtonUp(0) && GetTankForCurrentTurn().CurrentAP >= GameRules.FiringAPCost)
         {
-            if (_waitingForFirePath == false && fireChargeInProgress)
+            if (fireChargeInProgress)
             {
-                RequestFirePath();
+                AttemptWeaponFire();
             }
 
             fireChargeInProgress = false;
@@ -736,30 +728,20 @@ public class TankGameManager : MonoBehaviour
             //Skip remainder of turn
             ExampleManager.NetSend("skipTurn");
         }
-
-        //if (updateUI)
-        //{
-        //    UpdateUI(ExampleManager.Instance.Room.State);
-        //}
     }
 
     /// <summary>
-    /// Send a request to the server for the firing path of our tank
+    /// Send a request to the server to fire our weapon
     /// </summary>
-    private void RequestFirePath()
+    private void AttemptWeaponFire()
     {
-        _waitingForFirePath = true;
-
         TankController tank = GetTankForCurrentTurn();
 
         ExampleVector3Obj barrelForward = new ExampleVector3Obj(tank.BarrelForward);
         ExampleVector3Obj barrelPosition = new ExampleVector3Obj(environmentBuilder.groundPieceRoot.InverseTransformPoint(tank.BarrelPosition));
 
         ExampleManager.NetSend("fireWeapon", new FireWeaponMessage() { barrelForward = barrelForward, barrelPosition = barrelPosition, cannonPower = tank.CannonPower });
-        //ExampleManager.CustomServerMethod("getFirePath", new object[] { barrelForward, barrelPosition, tank.CannonPower });
-
-        // Reset flag for waiting for fire path if the request times out
-        Invoke("ResetWaitForFirePath", 5.0f);
+        
     }
 
     /// <summary>
@@ -933,14 +915,6 @@ public class TankGameManager : MonoBehaviour
             }
         }
 
-    }
-
-    /// <summary>
-    /// Callback to reset the bool flag after a request to get a firing path has timed out
-    /// </summary>
-    private void ResetWaitForFirePath()
-    {
-        _waitingForFirePath = false;
     }
 
 }

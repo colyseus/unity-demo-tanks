@@ -146,10 +146,9 @@ public class TankController : MonoBehaviour
         if (!canAct)
             return;
         ExampleManager.NetSend("changeWeapon", desIndex);
-        //ExampleManager.CustomServerMethod("changeWeapon", new object[] { desIndex });
     }
 
-    public void UpdateSelectedWeapon(Weapon/*WeaponModel*/ weapon)
+    public void UpdateSelectedWeapon(Weapon weapon)
     {
         cannon.ChangeWeapon(weapon);
     }
@@ -160,28 +159,6 @@ public class TankController : MonoBehaviour
             return;
 
         cannon.EndCharging();
-    }
-
-    public void Fire(CannonController.CannonFirePath firePath = null, DamageData damageData = null)
-    {
-        if (firePath == null && (!canAct || CurrentAP < GameRules.FiringAPCost))
-            return;
-
-        canAct = false;
-        
-        cannon.FireCannon(firePath, damageData, () =>
-        {
-            StartCoroutine(DelayAfterCannonImpact());
-        });
-        
-        cannon.EndCharging();
-    }
-
-    IEnumerator DelayAfterCannonImpact()
-    {
-        yield return new WaitForSeconds(1.0f);
-        
-        TankGameManager.Instance.FocusOnPlayer();
     }
 
     public float? AdjustAim(float delta)
