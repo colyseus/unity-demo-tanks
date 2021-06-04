@@ -38,10 +38,6 @@ export class Projectile extends Schema {
 
         let currTargetPos: Vector_2 = this.projectilePath[this.currentPathIndex];
 
-        // if(projectile == null) {
-        //     projectile = this.state.addNewProjectile(currTargetPos);
-        // }
-
         let currPos: Vector_2 = this.vector2Position();
 
         let newPos = this.vector2Helper.lerpVectors(currPos, currTargetPos, 25 * deltaTime);
@@ -59,8 +55,6 @@ export class Projectile extends Schema {
                 if(this.onComplete) {
                     this.onComplete(this);
                 }
-
-                //this.state.removeProjectile();
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Colyseus;
 using Colyseus.Schema;
 using GameDevWare.Serialization;
 using LucidSightTools;
@@ -40,10 +41,11 @@ public class EnvironmentBuilder : MonoBehaviour
 
     public GameObject tankPrefab;
 
-    public ArraySchema<float> mapMatrix;
+    public MapSchema<float> mapMatrix;
     public int MapWidth { get; private set; }
     public int MapHeight { get; private set; }
     private GameObject[,] spawnGameObjects = null;
+    private GameObject[] tanks = null;
 
     public void BuildEnvironment(World world)
     {
@@ -53,8 +55,8 @@ public class EnvironmentBuilder : MonoBehaviour
             return;
         }
 
-        MapWidth = (int)world.width/*matrix.Count*/;
-        MapHeight = (int)world.height/*matrix[0].Count*/;
+        MapWidth = (int)world.width;
+        MapHeight = (int)world.height;
         mapMatrix = world.grid;
 
         //for (int i = 0; i < world.grid.Count; i++)
@@ -84,7 +86,7 @@ public class EnvironmentBuilder : MonoBehaviour
         //Debug.Log(arrayString);
 
         ClearEnvironment();
-        GenerateFromMap(mapMatrix);
+        GenerateFromMap(/*mapMatrix*/);
     }
 
     public void ClearEnvironment()
@@ -101,6 +103,14 @@ public class EnvironmentBuilder : MonoBehaviour
 
             spawnGameObjects = null;
         }
+
+        if (tanks != null)
+        {
+            for (int i = 0; i < tanks.Length; i++)
+            {
+                DestroyImmediate(tanks[i]);
+            }
+        }
     }
 
     #region EnvironmentUtilities
@@ -112,14 +122,16 @@ public class EnvironmentBuilder : MonoBehaviour
         idx = index;
 
         //LSLog.LogImportant($"Get Grid Value At ({x}, {y}) = {(float)mapMatrix.GetByIndex(index)/*mapMatrix[index]*/} - Index = {index}");
-
-        return (float)mapMatrix.GetByIndex(index); //mapMatrix[index];
+        ;
+        return (float)mapMatrix[index.ToString()];
     }
 
     public void SetGridValueAt(int x, int y, int value)
     {
         int index = x + MapWidth * y;
-        mapMatrix[index] = value;
+
+        //mapMatrix.AsDictionary()[index.ToString()] = (float)value;
+        mapMatrix[index.ToString()] = value;
     }
 
     public Vector3 CoordinateToWorldPosition(MapCoordinates coordinates)
@@ -204,9 +216,9 @@ public class EnvironmentBuilder : MonoBehaviour
 #endregion
 
     //Create the map given a 1d array
-    private void GenerateFromMap(ArraySchema<float> map)
+    private void GenerateFromMap(/*ArraySchema<float> map*/)
     {
-        GameObject[] tanks = new GameObject[2];
+        tanks = new GameObject[2];
         spawnGameObjects = new GameObject[MapWidth, MapHeight];
         int gridValue;
         for (int x = 0; x < MapWidth/*map.Count*/; ++x)
@@ -238,7 +250,7 @@ public class EnvironmentBuilder : MonoBehaviour
                         {
                             tanks[0] = tank;
                         }
-                        spawnGameObjects[x, y] = tank;
+
                         break;
                 }
             }
@@ -279,6 +291,30 @@ public class EnvironmentBuilder : MonoBehaviour
             
         }
 
+    }
+
+    public void UpdateChangedGridCoordinate(string index, float value)
+    {
+        if (int.TryParse(index, out int idx))
+        {
+            int x = idx % MapWidth;
+            int y = idx / MapWidth;
+
+            switch ((int)value)
+            {
+                case (int)eMapItem.EMPTY:
+                case (int)eMapItem.PLAYER_1:
+                case (int)eMapItem.PLAYER_2:
+
+                    spawnGameObjects[x, y]?.SetActive(false);
+
+                    break;
+            }
+        }
+        else
+        {
+            LSLog.LogError($"Error updating changed grid - Index = {index}  Value = {value}");
+        }
     }
 
 }

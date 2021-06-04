@@ -15,10 +15,7 @@ namespace Tanks {
 		[Type(1, "number")]
 		public float height = default(float);
 
-		[Type(2, "array", typeof(ArraySchema<float>), "number")]
-		public ArraySchema<float> grid = new ArraySchema<float>();
-
-		[Type(3, "array", typeof(ArraySchema<float>), "number")]
-		public ArraySchema<float> damageData = new ArraySchema<float>();
+		[Type(2, "map", typeof(MapSchema<float>), "number")]
+		public MapSchema<float> grid = new MapSchema<float>();
 	}
 }

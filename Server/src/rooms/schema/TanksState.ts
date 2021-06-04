@@ -185,9 +185,7 @@ export class TanksState extends Schema {
             activeWeapon.impactDamage
         );
 
-        //this.environmentBuilder.overrideEnvironmentWithLocal();
-
-        if (damageData.updatedPlayers) {
+        if (damageData && damageData.updatedPlayers) {
             damageData.updatedPlayers.forEach((updatedPlayer) => {
                 const player = this.players[updatedPlayer.playerId];
 

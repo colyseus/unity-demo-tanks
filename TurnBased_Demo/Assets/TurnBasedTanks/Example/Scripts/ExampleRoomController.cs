@@ -81,6 +81,9 @@ public class ExampleRoomController
     public delegate void OnWorldChanged(List<DataChange> changes);
     public static event OnWorldChanged onWorldChanged;
 
+    public delegate void OnWorldGridChanged(string index, float value);
+    public static event OnWorldGridChanged onWorldGridChanged;
+
     public delegate void OnPlayerChange(int playerId, List<DataChange> changes);
     public static event OnPlayerChange onPlayerChange;
 
@@ -453,7 +456,8 @@ public class ExampleRoomController
 
         //Custom game logic
         _room.State.world.OnChange += changes => onWorldChanged?.Invoke(changes);
-        //_room.OnMessage<TankTurnUpdateMessage>("initialSetUp", (message) => { onInitialSetup?.Invoke(message.playerTurnId, message.playerTurn, message.currentPlayerAP, message.playerNames, message.playerHP, message.currentWeapon, message.worldMap, message.challengerOnline); });
+
+        _room.State.world.grid.OnChange += (index, value) => onWorldGridChanged?.Invoke(index, value);
 
         _room.OnMessage<TankTurnUpdateMessage>("turnComplete", (message) =>
         {
@@ -646,7 +650,7 @@ public class ExampleRoomController
     /// <param name="key">The user key</param>
     private void OnUserAdd(int key, Tanks.Player user)
     {
-        LSLog.LogImportant($"user [{user.__refId} | {user.sessionId} | key {key}] Joined");
+        //LSLog.LogImportant($"user [{user.__refId} | {user.sessionId} | key {key}] Joined");
 
         // Add "player" to map of players
         _users.Add(key, user);
@@ -659,7 +663,7 @@ public class ExampleRoomController
         // On entity update...
         user.OnChange += changes =>
         {
-            LSLog.LogImportant($"User.OnChange!", LSLog.LogColor.cyan);
+            //LSLog.LogImportant($"User.OnChange!", LSLog.LogColor.cyan);
             //user.updateHash = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
 
             //// If the change is for our current user then fire the event with the attributes that changed
@@ -669,7 +673,7 @@ public class ExampleRoomController
             //    OnCurrentUserStateChanged?.Invoke(user/*.attributes*/);
             //}
             
-            LSLog.LogImportant($"Player Change - Player = {user.sessionId}/{user.playerId}/{user.name}", LSLog.LogColor.grey);
+            //LSLog.LogImportant($"Player Change - Player = {user.sessionId}/{user.playerId}/{user.name}", LSLog.LogColor.grey);
 
             onPlayerChange?.Invoke((int)user.playerId, changes);
         };

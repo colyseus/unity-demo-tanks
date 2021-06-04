@@ -1,7 +1,7 @@
 export const GameRules = {
     MaxActionPoints: 3,
     MovementActionPointCost: 1,
-    FiringActionPointCost: 2,
+    FiringActionPointCost: 0,
 
     MaxMovement: 3,
     MaxHitPoints: 3,

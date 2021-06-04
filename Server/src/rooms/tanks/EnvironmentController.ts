@@ -1,4 +1,4 @@
-import { ArraySchema } from "@colyseus/schema";
+import { ArraySchema, MapSchema } from "@colyseus/schema";
 import { Vector2, Vector3 } from "three";
 import logger from "../../helpers/logger";
 import { TanksState } from "../schema/TanksState";
@@ -21,8 +21,6 @@ export class EnvironmentBuilder
 {
     constructor (private state: TanksState) {}
     
-    localGrid: number[]; // Locally cached version of game environment used to track player movement as well as damage done to the environment
-
     //Map Generation code
     //=======================================================================================================
     public GenerateEnvironment(width: number, height: number){
@@ -30,9 +28,9 @@ export class EnvironmentBuilder
         this.state.world.width = width;
         this.state.world.height = height;
 
-        this.state.world.grid = new ArraySchema<number>();
+        this.state.world.grid = new /*ArraySchema*/MapSchema<number>();
 
-        this.localGrid = new Array(width * height);
+        //this.localGrid = new Array(width * height);
 
         let randomSeed: number = Math.random() * 50;
         let variation: number = 1.5;
@@ -51,16 +49,12 @@ export class EnvironmentBuilder
             for (let y = 0; y < height; ++y) {
                 let val: number = (y < noiseHeight) ? MapIconValues.GROUND : MapIconValues.EMPTY;
                 
-                this.SetGridValueAt(x, y, val, true);
+                this.SetGridValueAt(x, y, val);
             }
         }
 
         this.SetPlayerSpawns(height);
         
-        //console.log(JSON.stringify(this.state.world.grid));
-
-        //console.log(`*** Environment Array Length = ${this.state.world.grid.length}  `);
-
     }
 
     // Alias for world width/height
@@ -74,33 +68,9 @@ export class EnvironmentBuilder
      * @param value 
      * @param syncWorld Should the world schema be updated? True will cause clients to rebuild their world environment
      */
-    private SetGridValueAt(x: number, y: number, value: number, syncWorld: boolean = false) {
+    private SetGridValueAt(x: number, y: number, value: number) {
 
-        console.log(`*** Set Grid Value At - (${x}, ${y})  Value = ${value}  Sync = ${syncWorld} ***`);
-
-        if(syncWorld) {
-            console.log(`*** Current Value Before Set = ${this.state.world.getGridValueAt(x, y)} ***`);
-            this.state.world.setGridValueAt(x, y, value);
-            console.log(`*** Current Value After Set = ${this.state.world.getGridValueAt(x, y)} ***`);
-        }
-
-        this.SetLocalGridValue(x, y, value);
-    }
-
-    public overrideEnvironmentWithLocal() {
-        //this.state.world.grid = new ArraySchema<number>(this.localGrid);
-    }
-
-    private SetLocalGridValue(x: number, y: number, value: number) {
-        const index = x + this.mapWidth * y;
-        
-        this.localGrid[index] = value;
-    }
-
-    private GetLocalGridValueAt(x: number, y: number): number {
-        const index = x + this.mapWidth * y;
-
-        return this.localGrid[index];
+        this.state.world.setGridValueAt(x, y, value);
     }
 
     private SetPlayerSpawns(height: number){
@@ -113,13 +83,13 @@ export class EnvironmentBuilder
 
         for (let y = 0; y < height && (!playerOnePlaced || !playerTwoPlaced); ++y)
         {
-            let gridOneVal: number = this.GetLocalGridValueAt(oneX, y);
-            let gridTwoVal: number = this.GetLocalGridValueAt(twoX, y);
+            let gridOneVal: number = this.state.world.getGridValueAt(oneX, y);
+            let gridTwoVal: number = this.state.world.getGridValueAt(twoX, y);
 
             if (gridOneVal === MapIconValues.EMPTY && !playerOnePlaced)
             {
                 //We have nothing in this square
-                this.SetGridValueAt(oneX, y, MapIconValues.PLAYER_1, true);
+                this.SetGridValueAt(oneX, y, MapIconValues.PLAYER_1);
                 playerOnePlaced = true;
                 this.SetPlayerPosition(0, new Vector2(oneX, y));
             }
@@ -127,7 +97,7 @@ export class EnvironmentBuilder
             if (gridTwoVal === MapIconValues.EMPTY && !playerTwoPlaced)
             {
                 //We have nothing in this square
-                this.SetGridValueAt(twoX, y, MapIconValues.PLAYER_2, true);
+                this.SetGridValueAt(twoX, y, MapIconValues.PLAYER_2);
                 playerTwoPlaced = true;
                 this.SetPlayerPosition(1, new Vector2(twoX, y));
             }
@@ -183,7 +153,7 @@ export class EnvironmentBuilder
                 try
                 {
                     //Check to see what is here
-                    switch (this.GetLocalGridValueAt(coords.x, coords.y))
+                    switch (this.state.world.getGridValueAt(coords.x, coords.y))
                     {
                         case MapIconValues.EMPTY:
                             updatedPath.push(origPath[i].clone());
@@ -249,7 +219,7 @@ export class EnvironmentBuilder
             return startPosition;
         }
         
-        let mapValue = this.GetLocalGridValueAt(newX, newY);
+        let mapValue = this.state.world.getGridValueAt(newX, newY);
 
         if (mapValue === MapIconValues.EMPTY)
         {
@@ -259,7 +229,7 @@ export class EnvironmentBuilder
         {
             //Don't pass the top of the map
             let yVal = Math.min(newY + 1, this.state.world.height);
-            let mapVal = this.GetLocalGridValueAt(newX, yVal);
+            let mapVal = this.state.world.getGridValueAt(newX, yVal);
 
             if(mapVal === MapIconValues.EMPTY)
             {
@@ -304,7 +274,7 @@ export class EnvironmentBuilder
 
         while(!groundFound)
         {
-            let mapVal = this.GetLocalGridValueAt(startX, yVal);
+            let mapVal = this.state.world.getGridValueAt(startX, yVal);
             
             if(mapVal === MapIconValues.EMPTY)
             {
@@ -339,8 +309,6 @@ export class EnvironmentBuilder
         const updatedPlayersMap = new Map<number, { playerId: number, damage?: number }>();
 
         let impactedCoordinates: Vector2[] = this.getImpactedCoordinatesList(coords, radius);
-
-        console.log(`*** Deal Damage - Impacted Coordinates = `, impactedCoordinates);
 
         for (let i: number = 0; i < impactedCoordinates.length; ++i)
         {
@@ -386,16 +354,14 @@ export class EnvironmentBuilder
         let damagedPlayers: number[];
 
         //Get what is at this position
-        let mapItem: number = this.GetLocalGridValueAt(coords.x, coords.y);
-
-        logger.silly(`*** Deal Damage to Coords - ${mapItem} ***`);
+        let mapItem: number = this.state.world.getGridValueAt(coords.x, coords.y);
 
         switch (mapItem)
         {
             case MapIconValues.GROUND:
             {
                 //Ground goes boom?
-                this.SetGridValueAt(coords.x, coords.y, MapIconValues.EMPTY, true);
+                this.SetGridValueAt(coords.x, coords.y, MapIconValues.EMPTY);
 
                 break;
             }
@@ -429,7 +395,7 @@ export class EnvironmentBuilder
         {
             for (let y = 0; y < this.mapHeight; ++y)
             {
-                let mapValue: number = this.GetLocalGridValueAt(x, y);
+                let mapValue: number = this.state.world.getGridValueAt(x, y);
                 switch (mapValue)
                 {
                     case MapIconValues.PLAYER_1:
