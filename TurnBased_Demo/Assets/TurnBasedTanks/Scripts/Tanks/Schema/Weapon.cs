@@ -24,7 +24,7 @@ namespace Tanks {
 		[Type(4, "number")]
 		public float impactDamage = default(float);
 
-        [Type(5, "number")]
-        public float index = default(float);
-    }
+		[Type(5, "number")]
+		public float index = default(float);
+	}
 }

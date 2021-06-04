@@ -155,8 +155,8 @@ export class EnvironmentBuilder
             : MapIconValues.PLAYER_2);
     }
 
-    public TrimFirePathToEnvironment(origPath: Vector3[]): Vector3[] {
-        let updatedPath: Vector3[] = [];
+    public TrimFirePathToEnvironment(origPath: Vector2[]): Vector2[] {
+        let updatedPath: Vector2[] = [];
         updatedPath.push(origPath[0].clone());
         let foundTermination: boolean = false;
         for (let i = 0; i < origPath.length; ++i)
@@ -183,7 +183,7 @@ export class EnvironmentBuilder
                         case MapIconValues.GROUND:
                             foundTermination = true;
                             //Create a new position thats 0.5 up from the ground block
-                            let pos: Vector3 = new Vector3(coords.x, coords.y, 0);
+                            let pos: Vector2 = new Vector2(coords.x, coords.y);
                             pos.x = origPath[i].x;
                             pos.y += 0.5;
                             updatedPath.push(pos);
@@ -202,9 +202,9 @@ export class EnvironmentBuilder
         return updatedPath;
     }
 
-    public ClientPositionToMapCoordinates(clientPos: Vector3) : Vector2
+    public ClientPositionToMapCoordinates(clientPos: Vector2) : Vector2
     {
-        let localPos: Vector3 = clientPos.clone();
+        let localPos: Vector2 = clientPos.clone();
         localPos.y = this.ClampNumber(localPos.y, 0.0, Number.MAX_VALUE);
         let coords: Vector2 = new Vector2(Math.round(localPos.x), Math.round(localPos.y));
         if (coords.y >= this.mapHeight)
@@ -320,7 +320,7 @@ export class EnvironmentBuilder
         return startY;
     }
 
-    public dealDamage(localPosition: Vector3, radius: number, damage: number) {
+    public dealDamage(localPosition: Vector2, radius: number, damage: number) {
         let coords: Vector2 = this.localPositionToMapCoordinates(localPosition);
         if (coords == null)
         {
@@ -486,7 +486,7 @@ export class EnvironmentBuilder
         return impactedPoints;
     }
 
-    public localPositionToMapCoordinates(localPos: Vector3): Vector2
+    public localPositionToMapCoordinates(localPos: Vector2): Vector2
     {
         localPos.y = this.ClampNumber(localPos.y, 0.0, Number.MAX_VALUE);
         let coords: Vector2 = new Vector2(Math.round(localPos.x), Math.round(localPos.y));

@@ -30,6 +30,10 @@ public class TankGameManager : MonoBehaviour
     [SerializeField]
     private CameraManager cameraManager = null;
 
+    public ProjectileBase projectilePrefab;
+
+    private ProjectileBase _projectile;
+
     private TankController playerOneTank;
     private TankController playerTwoTank;
 
@@ -85,6 +89,7 @@ public class TankGameManager : MonoBehaviour
 
         ExampleRoomController.onWorldChanged += OnWorldChanged;
         ExampleRoomController.onPlayerChange += OnPlayerUpdated;
+        ExampleRoomController.onProjectileUpdated += OnProjectileUpdated;
     }
 
     void OnDisable()
@@ -102,6 +107,22 @@ public class TankGameManager : MonoBehaviour
 
         ExampleRoomController.onWorldChanged -= OnWorldChanged;
         ExampleRoomController.onPlayerChange -= OnPlayerUpdated;
+        ExampleRoomController.onProjectileUpdated -= OnProjectileUpdated;
+    }
+
+    private void OnProjectileUpdated(List<DataChange> changes)
+    {
+        if (!_projectile)
+        {
+            _projectile = Instantiate(projectilePrefab);
+            _projectile.transform.SetParent(Builder.groundPieceRoot);
+            _projectile.transform.localPosition = new Vector3(ExampleManager.Instance.Room.State.projectile.coords.x,
+                ExampleManager.Instance.Room.State.projectile.coords.y);
+
+            return;
+        }
+
+        _projectile.UpdateTargetPosition(ExampleManager.Instance.Room.State.projectile.coords);
     }
 
     private void OnPlayerUpdated(int playerId, List<DataChange> changes)
@@ -267,7 +288,7 @@ public class TankGameManager : MonoBehaviour
     /// <param name="attributes"></param>
     private void OnRoomStateChanged(TanksState state, bool isFirstState)
     {
-        LSLog.LogImportant($"On Room State Changed - Is First State = {isFirstState}", LSLog.LogColor.yellow);
+        //LSLog.LogImportant($"On Room State Changed - Is First State = {isFirstState}", LSLog.LogColor.yellow);
 
         if (isFirstState)
         {// First state update; run initial setup

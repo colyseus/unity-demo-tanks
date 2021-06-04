@@ -3,9 +3,10 @@ import { TanksState, GameState } from "./schema/TanksState";
 import { Player, PlayerReadyState } from "./schema/Player";
 import { EnvironmentBuilder } from "./tanks/EnvironmentController";
 import { GameRules } from "./tanks/rules";
-import { Vector3 } from "three";
+import { Vector3, Vector2 as Vector_2 } from "three";
 import logger from "../helpers/logger";
 import { Vector2 } from "./schema/Vector2";
+import { Projectile } from "./schema/Projectile";
 
 export class TanksRoom extends Room<TanksState> {
     
@@ -13,8 +14,12 @@ export class TanksRoom extends Room<TanksState> {
 
     environmentController: EnvironmentBuilder; // Generates and maintains the game's terrain
     currPlayerMoveWait: number = 0; // Counter to help with the wait before allowing another action after the player has moved
-
+    
     patchRate = 50; // The ms delay between room state patch updates
+
+    currentPathIndex: number = 0;
+    projectilePath: Vector_2[] = null;
+    vector2Helper: Vector_2 = new Vector_2();
 
     /**
      * Callback for when the room is created
@@ -133,6 +138,9 @@ export class TanksRoom extends Room<TanksState> {
                         }
                     }
                 }
+                else if(this.projectilePath) {
+                    this.updateProjectileAlongPath(deltaTimeSeconds);
+                }
                 break;
 
             case GameState.EndRound:
@@ -156,6 +164,38 @@ export class TanksRoom extends Room<TanksState> {
                 break;
         }
 
+    }
+
+    private updateProjectileAlongPath(deltaTime: number) {
+
+        let projectile = this.state.getProjectile();
+
+        if(projectile == null) {
+            projectile = this.state.addNewProjectile();
+        }
+
+        let currPos: Vector_2 = projectile.position();
+
+        let currTargetPos: Vector_2 = this.projectilePath[this.currentPathIndex];
+
+        let newPos = this.vector2Helper.lerpVectors(currPos, currTargetPos, 25 * deltaTime);
+
+        projectile.coords.assign({x: newPos.x, y: newPos.y});
+
+        if(projectile.position().distanceTo(currTargetPos) < 0.05) {
+
+            this.currentPathIndex++;
+            
+            if(this.currentPathIndex >= this.projectilePath.length) {
+
+                logger.error(`*** Projectile go BOOM! ***`);
+
+                this.state.removeProjectile();
+
+                this.projectilePath = null;
+                this.currentPathIndex = 0;
+            }
+        }
     }
 
     private registerMessageHandlers() {
@@ -217,12 +257,8 @@ export class TanksRoom extends Room<TanksState> {
             // Attempt to move the player
             if (canMove) {
 
-                this.environmentController.SetPlayerPosition(player.playerId, nextPosition);
-
                 // update player coords
-                //player.coords.assign(nextPosition);
-
-                // Update world
+                this.environmentController.SetPlayerPosition(player.playerId, nextPosition);
 
                 // Consume AP
                 player.consumeActionPoints(GameRules.MovementActionPointCost);
@@ -264,13 +300,14 @@ export class TanksRoom extends Room<TanksState> {
             console.log(`*** Fire Weapon - Barrel Forward =`, barrelForward, `  Barrel Pos = `, barrelPosition, `  Cannon Power = `, cannonPower, ` ***`);
 
             // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
-            let firePath: Vector3[] = this.state.getFirePath(
+            this.projectilePath = this.state.getFirePath(
                 this.environmentController,
                 new Vector3(barrelForward.x, barrelForward.y, barrelForward.z),
                 new Vector3(barrelPosition.x, barrelPosition.y, barrelPosition.z),
                 cannonPower
             );
 
+            //logger.silly(`*** Got Fire Patch: `); console.log(this.projectilePath);
 
         });
 
@@ -299,7 +336,7 @@ export class TanksRoom extends Room<TanksState> {
             }
 
             // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
-            let firePath: Vector3[] = this.state.getFirePath(
+            let firePath: Vector_2[] = this.state.getFirePath(
                 this.environmentController,
                 new Vector3(barrelForward.x, barrelForward.y, barrelForward.z),
                 new Vector3(barrelPosition.x, barrelPosition.y, barrelPosition.z),

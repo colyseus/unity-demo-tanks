@@ -1,9 +1,11 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
-import { Vector3 } from "three";
+import { Vector3, Vector2 } from "three";
+import logger from "../../helpers/logger";
 import { EnvironmentBuilder } from "../tanks/EnvironmentController";
 
 import { GameRules, weaponList } from "../tanks/rules";
 import { Player, PlayerReadyState } from "./Player";
+import { Projectile } from "./Projectile";
 import { Weapon } from "./Weapon";
 import { World } from "./World";
 
@@ -19,6 +21,7 @@ export class TanksState extends Schema {
     @type([ Player ]) players = new ArraySchema<Player>();
     @type([Weapon]) weapons = new ArraySchema<Weapon>();
     @type(World) world = new World();
+    @type([Projectile]) projectiles = new ArraySchema<Projectile>();
 
     @type("string") gameState: GameState;
     @type("string") previousGameState: GameState;
@@ -108,11 +111,11 @@ export class TanksState extends Schema {
     }
 
     // FIXME: this method could be extracted inside Environment class
-    getFirePath(environment: EnvironmentBuilder, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector3[] {
+    getFirePath(environment: EnvironmentBuilder, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector2[] {
         let initialVelocity: Vector3 = barrelForward.clone().multiplyScalar(cannonPower);
-        let currentVelocity: Vector3 = initialVelocity;
-        let currPos: Vector3 = barrelPosition.clone();
-        let pathSteps: Vector3[] = [];
+        let currentVelocity: Vector2 = new Vector2(initialVelocity.x, initialVelocity.y);
+        let currPos: Vector2 = new Vector2(barrelPosition.x, barrelPosition.y);// barrelPosition.clone();
+        let pathSteps: Vector2[] = [];
         pathSteps.push(currPos.clone());
         const grav: number = -0.98;
         while (currPos.y > -1.0) {
@@ -125,15 +128,15 @@ export class TanksState extends Schema {
     }
 
     // FIXME: this method could be extracted inside Environment class
-    getHighAccuracyFirePath(environment: EnvironmentBuilder, originalPath: Vector3[]) {
-        let newPath: Vector3[] = [];
-        let previousPos: Vector3 = originalPath[0].clone();
+    getHighAccuracyFirePath(environment: EnvironmentBuilder, originalPath: Vector2[]) {
+        let newPath: Vector2[] = [];
+        let previousPos: Vector2 = originalPath[0].clone();
 
         newPath.push(previousPos.clone());
         for (let i = 1; i < originalPath.length; ++i) {
             let currPathSeg = originalPath[i].clone();
             let dist: number = Math.floor(previousPos.distanceTo(currPathSeg)) * 2;
-            let stepSize: Vector3 = new Vector3().subVectors(currPathSeg, previousPos).divideScalar(dist);
+            let stepSize: Vector2 = new Vector2().subVectors(currPathSeg, previousPos).divideScalar(dist);
 
             for (let j = 0; j < dist; ++j) {
                 previousPos.add(stepSize);
@@ -142,5 +145,45 @@ export class TanksState extends Schema {
         }
 
         return environment.TrimFirePathToEnvironment(newPath);
+    }
+
+    addNewProjectile(): Projectile {
+
+        const projectile = new Projectile();
+
+        this.projectiles.push(projectile);
+
+        return projectile;
+    }
+
+    /**
+     * Removes the projectile from the collection.
+     * Currently assumes there will only ever be one projectile at a time in the collection.
+     * Will cause the projectile on the client to explode
+     * @returns 
+     */
+    removeProjectile() {
+
+        if(this.projectiles.length == 0) {
+            
+            logger.error(`*** No projectile to remove? ***`);
+            return;
+        }
+
+        this.projectiles.shift();
+    }
+
+    /**
+     * Returns the first projectile in the collection.
+     * Currently assumes there will only ever be one projectile at a time in the collection.
+     * @returns 
+     */
+    getProjectile(): Projectile {
+
+        if(this.projectiles.length == 0) {
+            return null;
+        }
+
+        return this.projectiles[0];
     }
 }

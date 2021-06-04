@@ -18,19 +18,22 @@ namespace Tanks {
 		[Type(2, "ref", typeof(World))]
 		public World world = new World();
 
-		[Type(3, "string")]
-		public string gameState = default(string);
+		[Type(3, "array", typeof(ArraySchema<Projectile>))]
+		public ArraySchema<Projectile> projectiles = new ArraySchema<Projectile>();
 
 		[Type(4, "string")]
+		public string gameState = default(string);
+
+		[Type(5, "string")]
 		public string previousGameState = default(string);
 
-		[Type(5, "number")]
+		[Type(6, "number")]
 		public float currentTurn = default(float);
 
-		[Type(6, "number")]
+		[Type(7, "number")]
 		public float turnNumber = default(float);
 
-		[Type(7, "string")]
+		[Type(8, "string")]
 		public string statusMessage = default(string);
 	}
 }

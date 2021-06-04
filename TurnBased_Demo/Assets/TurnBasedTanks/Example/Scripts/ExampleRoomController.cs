@@ -84,6 +84,9 @@ public class ExampleRoomController
     public delegate void OnPlayerChange(int playerId, List<DataChange> changes);
     public static event OnPlayerChange onPlayerChange;
 
+    public delegate void OnProjectileUpdated(List<DataChange> changes);
+    public static event OnProjectileUpdated onProjectileUpdated;
+
     public delegate void OnReceivedFirePath(int player, int remainingAP, List<Vector3> firePath, DamageData damageData);
     public static event OnReceivedFirePath onReceivedFirePath;
 
@@ -465,7 +468,9 @@ public class ExampleRoomController
         
         _room.State.players.OnAdd += OnUserAdd;
         _room.State.players.OnRemove += OnUserRemove;
-        
+
+        //_room.State.projectile.coords.OnChange += changes => { onProjectileUpdated?.Invoke(changes);};
+
         _room.State.TriggerAll();
         //========================
 

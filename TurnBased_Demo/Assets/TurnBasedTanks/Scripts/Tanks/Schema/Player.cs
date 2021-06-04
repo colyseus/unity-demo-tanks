@@ -30,10 +30,10 @@ namespace Tanks {
 		[Type(6, "number")]
 		public float currentWeapon = default(float);
 
-        [Type(7, "number")]
-        public float aimAngle = default(float);
+		[Type(7, "number")]
+		public float aimAngle = default(float);
 
-        [Type(8, "number")]
+		[Type(8, "number")]
 		public float currentMovement = default(float);
 
 		[Type(9, "number")]

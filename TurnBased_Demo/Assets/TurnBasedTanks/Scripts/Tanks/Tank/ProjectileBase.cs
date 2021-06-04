@@ -23,6 +23,7 @@ public class ProjectileBase : MonoBehaviour
 
     private CannonBase currentWeapon;
     private DamageData _damageData;
+    private Vector2? _targetPosition;
 
     public void HandPath(CannonController.CannonFirePath path, Action onComplete, CannonBase weapon, DamageData damageData)
     {
@@ -37,27 +38,39 @@ public class ProjectileBase : MonoBehaviour
         currentWeapon = weapon;
     }
 
+    public void UpdateTargetPosition(Tanks.Vector2 position)
+    {
+        _targetPosition = new Vector2(position.x, position.y);
+    }
+
     void Update()
     {
-        if (currentTravelPath == null)
+        if (_targetPosition == null)
+        {
             return;
-
-        transform.localPosition/*position*/ = Vector3.MoveTowards(transform.localPosition/*position*/, currentTravelPath.path[currentPathIndex], moveSpeed * Time.deltaTime);
-        if (Vector3.Distance(transform.localPosition, currentTravelPath.path[currentPathIndex]) < 0.05f)
-        {
-            ++currentPathIndex;
-            if (currentPathIndex >= currentTravelPath.path.Length)
-            {
-                //Boom
-                currentTravelPath = null;
-                Invoke("Explode", explodeDelay);
-            }
         }
 
-        if (followProjectile)
-        {
-            TankGameManager.Instance.FocusOnPosition(transform.position, false, null);
-        }
+        transform.localPosition = Vector3.Slerp(transform.localPosition, (Vector2)_targetPosition, moveSpeed * Time.deltaTime);
+
+        //if (currentTravelPath == null)
+        //    return;
+
+        //transform.localPosition/*position*/ = Vector3.MoveTowards(transform.localPosition/*position*/, currentTravelPath.path[currentPathIndex], moveSpeed * Time.deltaTime);
+        //if (Vector3.Distance(transform.localPosition, currentTravelPath.path[currentPathIndex]) < 0.05f)
+        //{
+        //    ++currentPathIndex;
+        //    if (currentPathIndex >= currentTravelPath.path.Length)
+        //    {
+        //        //Boom
+        //        currentTravelPath = null;
+        //        Invoke("Explode", explodeDelay);
+        //    }
+        //}
+
+        //if (followProjectile)
+        //{
+        //    TankGameManager.Instance.FocusOnPosition(transform.position, false, null);
+        //}
     }
 
     void Explode()
