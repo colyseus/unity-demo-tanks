@@ -17,10 +17,6 @@ export class TanksRoom extends Room<TanksState> {
     
     patchRate = 50; // The ms delay between room state patch updates
 
-    currentPathIndex: number = 0;
-    projectilePath: Vector_2[] = null;
-    vector2Helper: Vector_2 = new Vector_2();
-
     /**
      * Callback for when the room is created
      * @param {*} options The room options sent from the client when creating a room
@@ -53,6 +49,9 @@ export class TanksRoom extends Room<TanksState> {
         }));
 
         this.environmentController = new EnvironmentBuilder(this.state);
+
+        this.state.environmentBuilder = this.environmentController;
+
         this.resetForNewRound();
 
         this.registerMessageHandlers();
@@ -138,9 +137,8 @@ export class TanksRoom extends Room<TanksState> {
                         }
                     }
                 }
-                else if(this.projectilePath) {
-                    this.updateProjectileAlongPath(deltaTimeSeconds);
-                }
+                
+                this.updateProjectiles(deltaTimeSeconds);
                 break;
 
             case GameState.EndRound:
@@ -166,36 +164,16 @@ export class TanksRoom extends Room<TanksState> {
 
     }
 
-    private updateProjectileAlongPath(deltaTime: number) {
+    private updateProjectiles(deltaTime: number){
 
-        let projectile = this.state.getProjectile();
-
-        if(projectile == null) {
-            projectile = this.state.addNewProjectile();
+        if(this.state.projectiles == null) {
+            return;
         }
 
-        let currPos: Vector_2 = projectile.position();
+        this.state.projectiles.forEach((projectile, key) =>{
 
-        let currTargetPos: Vector_2 = this.projectilePath[this.currentPathIndex];
-
-        let newPos = this.vector2Helper.lerpVectors(currPos, currTargetPos, 25 * deltaTime);
-
-        projectile.coords.assign({x: newPos.x, y: newPos.y});
-
-        if(projectile.position().distanceTo(currTargetPos) < 0.05) {
-
-            this.currentPathIndex++;
-            
-            if(this.currentPathIndex >= this.projectilePath.length) {
-
-                logger.error(`*** Projectile go BOOM! ***`);
-
-                this.state.removeProjectile();
-
-                this.projectilePath = null;
-                this.currentPathIndex = 0;
-            }
-        }
+            projectile.updateProjectileAlongPath(deltaTime);
+        });
     }
 
     private registerMessageHandlers() {
@@ -297,18 +275,20 @@ export class TanksRoom extends Room<TanksState> {
                 throw "Error - Get Fire Path - Missing parameter";
             }
 
-            console.log(`*** Fire Weapon - Barrel Forward =`, barrelForward, `  Barrel Pos = `, barrelPosition, `  Cannon Power = `, cannonPower, ` ***`);
+            //console.log(`*** Fire Weapon - Barrel Forward =`, barrelForward, `  Barrel Pos = `, barrelPosition, `  Cannon Power = `, cannonPower, ` ***`);
 
             // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
-            this.projectilePath = this.state.getFirePath(
+            let projectilePath: Vector_2[] = this.state.getFirePath(
                 this.environmentController,
                 new Vector3(barrelForward.x, barrelForward.y, barrelForward.z),
                 new Vector3(barrelPosition.x, barrelPosition.y, barrelPosition.z),
                 cannonPower
             );
 
-            //logger.silly(`*** Got Fire Patch: `); console.log(this.projectilePath);
-
+            this.state.addNewProjectile(client.userData.playerId, projectilePath);
+            
+            // Consume AP for firing weapon
+            player.consumeActionPoints(GameRules.FiringActionPointCost);
         });
 
         this.onMessage("getFirePath", (client, message) => {

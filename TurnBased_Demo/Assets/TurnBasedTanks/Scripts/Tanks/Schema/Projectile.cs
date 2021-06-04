@@ -9,7 +9,10 @@ using Colyseus.Schema;
 
 namespace Tanks {
 	public partial class Projectile : Schema {
-		[Type(0, "ref", typeof(Vector2))]
+		[Type(0, "string")]
+		public string key = default(string);
+
+		[Type(1, "ref", typeof(Vector2))]
 		public Vector2 coords = new Vector2();
 	}
 }

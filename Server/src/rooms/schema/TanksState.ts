@@ -21,7 +21,7 @@ export class TanksState extends Schema {
     @type([ Player ]) players = new ArraySchema<Player>();
     @type([Weapon]) weapons = new ArraySchema<Weapon>();
     @type(World) world = new World();
-    @type([Projectile]) projectiles = new ArraySchema<Projectile>();
+    @type({ map: Projectile }) projectiles = new MapSchema<Projectile>();
 
     @type("string") gameState: GameState;
     @type("string") previousGameState: GameState;
@@ -33,6 +33,7 @@ export class TanksState extends Schema {
 
     isPlayerMoving: boolean = false;
     creatorId: string = "";
+    environmentBuilder: EnvironmentBuilder;
 
     constructor() {
         super();
@@ -147,13 +148,59 @@ export class TanksState extends Schema {
         return environment.TrimFirePathToEnvironment(newPath);
     }
 
-    addNewProjectile(): Projectile {
+    addNewProjectile(playerId: number, path: Vector2[]): Projectile {
 
-        const projectile = new Projectile();
+        if(path == null || path.length == 0) {
 
-        this.projectiles.push(projectile);
+            logger.error(`*** Cannot add projectile when there is no path! ***`);
+
+            return;
+        }
+
+        const projectile = new Projectile(playerId, path);
+        projectile.onComplete = () => {
+
+            // Deal damage to the environment
+            this.dealEnvironmentAndPlayerDamage(projectile);
+            
+            // Remove the projectile
+            this.removeProjectile(projectile);
+        }
+
+        projectile.coords.assign(path[0]);
+
+        this.projectiles.set(projectile.key, projectile);
 
         return projectile;
+    }
+
+    private dealEnvironmentAndPlayerDamage(projectile: Projectile) {
+        // Get the player's currently active weapon
+        const activeWeapon = this.getActiveWeapon(projectile.playerId);
+
+        // Send the impact position to the environment controller to check if any damage is done to terrain or player
+        const damageData = this.environmentBuilder.dealDamage(
+            projectile.projectilePath[projectile.projectilePath.length - 1],
+            activeWeapon.radius,
+            activeWeapon.impactDamage
+        );
+
+        //this.environmentBuilder.overrideEnvironmentWithLocal();
+
+        if (damageData.updatedPlayers) {
+            damageData.updatedPlayers.forEach((updatedPlayer) => {
+                const player = this.players[updatedPlayer.playerId];
+
+                // Update player HP if there is damage
+                if (updatedPlayer.damage) {
+                    player.hp -= updatedPlayer.damage;
+                }
+
+                if (player.hp <= 0) {
+                    this.moveToState(GameState.EndRound);
+                }
+            });
+        }
     }
 
     /**
@@ -162,28 +209,15 @@ export class TanksState extends Schema {
      * Will cause the projectile on the client to explode
      * @returns 
      */
-    removeProjectile() {
+    removeProjectile(projectile: Projectile) {
 
-        if(this.projectiles.length == 0) {
+        if(this.projectiles.has(projectile.key) == false) {
             
-            logger.error(`*** No projectile to remove? ***`);
+            logger.error(`*** No projectile with key ${projectile.key} ***`);
             return;
         }
 
-        this.projectiles.shift();
+        this.projectiles.delete(projectile.key);
     }
 
-    /**
-     * Returns the first projectile in the collection.
-     * Currently assumes there will only ever be one projectile at a time in the collection.
-     * @returns 
-     */
-    getProjectile(): Projectile {
-
-        if(this.projectiles.length == 0) {
-            return null;
-        }
-
-        return this.projectiles[0];
-    }
 }

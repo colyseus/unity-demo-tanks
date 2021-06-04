@@ -73,12 +73,13 @@ public class ProjectileBase : MonoBehaviour
         //}
     }
 
-    void Explode()
+    public void Explode()
     {
-        Destroy(gameObject);
+        //Destroy(gameObject);
+        gameObject.SetActive(false);
         GameObject effect = Instantiate(explosionPrefab, transform.position, Quaternion.identity);
-        onImpact?.Invoke();
+        //onImpact?.Invoke();
 
-        TankGameManager.Instance.RegisterExplosion(_damageData);
+        //TankGameManager.Instance.RegisterExplosion(_damageData);
     }
 }

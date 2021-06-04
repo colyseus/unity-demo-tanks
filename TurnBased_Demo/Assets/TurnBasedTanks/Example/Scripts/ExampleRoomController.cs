@@ -84,7 +84,13 @@ public class ExampleRoomController
     public delegate void OnPlayerChange(int playerId, List<DataChange> changes);
     public static event OnPlayerChange onPlayerChange;
 
-    public delegate void OnProjectileUpdated(List<DataChange> changes);
+    public delegate void OnProjectileAdded(Projectile projectile);
+    public static event OnProjectileAdded onProjectileAdded;
+
+    public delegate void OnProjectileRemoved(Projectile cachedProjectile);
+    public static event OnProjectileRemoved onProjectileRemoved;
+
+    public delegate void OnProjectileUpdated(Projectile projectile, List<DataChange> changes);
     public static event OnProjectileUpdated onProjectileUpdated;
 
     public delegate void OnReceivedFirePath(int player, int remainingAP, List<Vector3> firePath, DamageData damageData);
@@ -164,6 +170,8 @@ public class ExampleRoomController
     /// </summary>
     private IndexedDictionary<int, Player> _users =
         new IndexedDictionary<int, Player>();
+
+    private Dictionary<string, Projectile> _projectiles = new Dictionary<string, Projectile>();
 
     /// <summary>
     ///     Used to help calculate the latency of the connection to the server.
@@ -469,7 +477,8 @@ public class ExampleRoomController
         _room.State.players.OnAdd += OnUserAdd;
         _room.State.players.OnRemove += OnUserRemove;
 
-        //_room.State.projectile.coords.OnChange += changes => { onProjectileUpdated?.Invoke(changes);};
+        _room.State.projectiles.OnAdd += OnProjectileAdd;
+        _room.State.projectiles.OnRemove += OnProjectileRemove;
 
         _room.State.TriggerAll();
         //========================
@@ -664,6 +673,35 @@ public class ExampleRoomController
 
             onPlayerChange?.Invoke((int)user.playerId, changes);
         };
+    }
+
+    private void OnProjectileAdd(string key, Projectile projectile)
+    {
+        //LSLog.LogImportant($"Projectile Added! - Key = {key}");
+
+        _projectiles.Add(key, projectile);
+
+        projectile.coords.OnChange += (changes) => { onProjectileUpdated?.Invoke(projectile, changes); };
+
+        projectile.OnChange += (changes) => { onProjectileUpdated?.Invoke(projectile, changes); };
+
+        onProjectileAdded?.Invoke(projectile);
+    }
+
+    private void OnProjectileRemove(string key, Projectile projectile)
+    {
+        //LSLog.LogImportant($"Projectile Removed! - Key = {key}");
+
+        if (_projectiles.ContainsKey(key))
+        {
+            onProjectileRemoved?.Invoke(_projectiles[key]);
+
+            _projectiles.Remove(key);
+        }
+        else
+        {
+            LSLog.LogError($"No projectile for key - {key}");
+        }
     }
 
     /// <summary>

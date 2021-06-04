@@ -32,8 +32,6 @@ public class TankGameManager : MonoBehaviour
 
     public ProjectileBase projectilePrefab;
 
-    private ProjectileBase _projectile;
-
     private TankController playerOneTank;
     private TankController playerTwoTank;
 
@@ -47,6 +45,8 @@ public class TankGameManager : MonoBehaviour
     public bool IsGameOver { get; private set; } = false;
 
     private Dictionary<string, string> attributeUpdate = new Dictionary<string, string>();
+
+    private Dictionary<Projectile, ProjectileBase> _projectileObjects = new Dictionary<Projectile, ProjectileBase>();
 
     private bool _waitingForFirePath = false;
 
@@ -89,6 +89,9 @@ public class TankGameManager : MonoBehaviour
 
         ExampleRoomController.onWorldChanged += OnWorldChanged;
         ExampleRoomController.onPlayerChange += OnPlayerUpdated;
+        ExampleRoomController.onProjectileAdded += OnProjectileAdded;
+        ExampleRoomController.onProjectileRemoved += OnProjectileRemoved;
+
         ExampleRoomController.onProjectileUpdated += OnProjectileUpdated;
     }
 
@@ -107,22 +110,58 @@ public class TankGameManager : MonoBehaviour
 
         ExampleRoomController.onWorldChanged -= OnWorldChanged;
         ExampleRoomController.onPlayerChange -= OnPlayerUpdated;
+        ExampleRoomController.onProjectileAdded -= OnProjectileAdded;
+        ExampleRoomController.onProjectileRemoved -= OnProjectileRemoved;
+
         ExampleRoomController.onProjectileUpdated -= OnProjectileUpdated;
     }
 
-    private void OnProjectileUpdated(List<DataChange> changes)
+    private void OnProjectileAdded(Projectile projectile)
     {
-        if (!_projectile)
+        if (_projectileObjects.ContainsKey(projectile) == false)
         {
-            _projectile = Instantiate(projectilePrefab);
-            _projectile.transform.SetParent(Builder.groundPieceRoot);
-            _projectile.transform.localPosition = new Vector3(ExampleManager.Instance.Room.State.projectile.coords.x,
-                ExampleManager.Instance.Room.State.projectile.coords.y);
+            // Create new projectile object
+            ProjectileBase proj = Instantiate(projectilePrefab);
+            proj.transform.SetParent(Builder.groundPieceRoot);
+            proj.transform.localPosition = new Vector3(projectile.coords.x, projectile.coords.y);
 
-            return;
+            _projectileObjects.Add(projectile, proj);
         }
+        else
+        {
+            LSLog.LogError($"On Projectile Added - Projectile has already been added!");
+        }
+    }
 
-        _projectile.UpdateTargetPosition(ExampleManager.Instance.Room.State.projectile.coords);
+    private void OnProjectileRemoved(Projectile projectile)
+    {
+        if (_projectileObjects.ContainsKey(projectile))
+        {
+            // Create new projectile object
+            ProjectileBase proj = _projectileObjects[projectile];
+
+            proj.Explode();
+
+            Destroy(proj.gameObject);
+
+            _projectileObjects.Remove(projectile);
+        }
+        else
+        {
+            LSLog.LogError($"On Projectile Added - No projectile object for projectile!");
+        }
+    }
+
+    private void OnProjectileUpdated(Projectile projectile, List<DataChange> changes)
+    {
+        if (_projectileObjects.ContainsKey(projectile))
+        {
+            _projectileObjects[projectile].UpdateTargetPosition(projectile.coords);
+        }
+        else
+        {
+            LSLog.LogError($"On Projectile Update - No projectile object for projectile!");
+        }
     }
 
     private void OnPlayerUpdated(int playerId, List<DataChange> changes)

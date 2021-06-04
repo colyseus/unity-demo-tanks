@@ -18,8 +18,8 @@ namespace Tanks {
 		[Type(2, "ref", typeof(World))]
 		public World world = new World();
 
-		[Type(3, "array", typeof(ArraySchema<Projectile>))]
-		public ArraySchema<Projectile> projectiles = new ArraySchema<Projectile>();
+		[Type(3, "map", typeof(MapSchema<Projectile>))]
+		public MapSchema<Projectile> projectiles = new MapSchema<Projectile>();
 
 		[Type(4, "string")]
 		public string gameState = default(string);

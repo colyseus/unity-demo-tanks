@@ -76,11 +76,19 @@ export class EnvironmentBuilder
      */
     private SetGridValueAt(x: number, y: number, value: number, syncWorld: boolean = false) {
 
+        console.log(`*** Set Grid Value At - (${x}, ${y})  Value = ${value}  Sync = ${syncWorld} ***`);
+
         if(syncWorld) {
+            console.log(`*** Current Value Before Set = ${this.state.world.getGridValueAt(x, y)} ***`);
             this.state.world.setGridValueAt(x, y, value);
+            console.log(`*** Current Value After Set = ${this.state.world.getGridValueAt(x, y)} ***`);
         }
 
         this.SetLocalGridValue(x, y, value);
+    }
+
+    public overrideEnvironmentWithLocal() {
+        //this.state.world.grid = new ArraySchema<number>(this.localGrid);
     }
 
     private SetLocalGridValue(x: number, y: number, value: number) {
@@ -331,6 +339,9 @@ export class EnvironmentBuilder
         const updatedPlayersMap = new Map<number, { playerId: number, damage?: number }>();
 
         let impactedCoordinates: Vector2[] = this.getImpactedCoordinatesList(coords, radius);
+
+        console.log(`*** Deal Damage - Impacted Coordinates = `, impactedCoordinates);
+
         for (let i: number = 0; i < impactedCoordinates.length; ++i)
         {
             let damagedPlayers: number[] = this.dealDamageToCoordinates(impactedCoordinates[i]);
@@ -367,7 +378,7 @@ export class EnvironmentBuilder
         
         const updatedPlayers = Array.from(updatedPlayersMap.values());
 
-        return { impactedCoordinates, updatedPlayers };
+        return {updatedPlayers};// { /*impactedCoordinates,*/ updatedPlayers };
     }
 
     private dealDamageToCoordinates(coords: Vector2): number[]
@@ -376,12 +387,15 @@ export class EnvironmentBuilder
 
         //Get what is at this position
         let mapItem: number = this.GetLocalGridValueAt(coords.x, coords.y);
+
+        logger.silly(`*** Deal Damage to Coords - ${mapItem} ***`);
+
         switch (mapItem)
         {
             case MapIconValues.GROUND:
             {
                 //Ground goes boom?
-                this.SetGridValueAt(coords.x, coords.y, MapIconValues.EMPTY);
+                this.SetGridValueAt(coords.x, coords.y, MapIconValues.EMPTY, true);
 
                 break;
             }
