@@ -9,31 +9,34 @@ using Colyseus.Schema;
 
 namespace Tanks {
 	public partial class TanksState : Schema {
-		[Type(0, "array", typeof(ArraySchema<Player>))]
+		[Type(0, "ref", typeof(GameRulesSchema))]
+		public GameRulesSchema gameRules = new GameRulesSchema();
+
+		[Type(1, "array", typeof(ArraySchema<Player>))]
 		public ArraySchema<Player> players = new ArraySchema<Player>();
 
-		[Type(1, "array", typeof(ArraySchema<Weapon>))]
+		[Type(2, "array", typeof(ArraySchema<Weapon>))]
 		public ArraySchema<Weapon> weapons = new ArraySchema<Weapon>();
 
-		[Type(2, "ref", typeof(World))]
+		[Type(3, "ref", typeof(World))]
 		public World world = new World();
 
-		[Type(3, "map", typeof(MapSchema<Projectile>))]
+		[Type(4, "map", typeof(MapSchema<Projectile>))]
 		public MapSchema<Projectile> projectiles = new MapSchema<Projectile>();
 
-		[Type(4, "string")]
+		[Type(5, "string")]
 		public string gameState = default(string);
 
-		[Type(5, "string")]
+		[Type(6, "string")]
 		public string previousGameState = default(string);
 
-		[Type(6, "number")]
+		[Type(7, "number")]
 		public float currentTurn = default(float);
 
-		[Type(7, "number")]
+		[Type(8, "number")]
 		public float turnNumber = default(float);
 
-		[Type(8, "string")]
+		[Type(9, "string")]
 		public string statusMessage = default(string);
 	}
 }

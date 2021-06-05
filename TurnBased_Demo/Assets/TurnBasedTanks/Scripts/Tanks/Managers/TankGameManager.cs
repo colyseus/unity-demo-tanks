@@ -76,10 +76,7 @@ public class TankGameManager : MonoBehaviour
     {
         // Subscribe to events
         ExampleRoomController.onRoomStateChanged += OnRoomStateChanged;
-        //ExampleRoomController.onInitialSetup += OnInitialSetup;
         ExampleRoomController.onTankMoved += OnPlayerMove;
-        //ExampleRoomController.onReceivedFirePath += OnReceivedFirePath;
-        //ExampleRoomController.onSelectedWeaponUpdated += OnSelectedWeaponUpdated;
         ExampleRoomController.onTurnCompleted += OnTurnCompleted;
         ExampleRoomController.onPlayerJoined += OnPlayerJoined;
         ExampleRoomController.onPlayerQuit += OnPlayerQuit;
@@ -97,7 +94,6 @@ public class TankGameManager : MonoBehaviour
         // Unsubscribe from events
         ExampleRoomController.onRoomStateChanged -= OnRoomStateChanged;
         ExampleRoomController.onTankMoved -= OnPlayerMove;
-        //ExampleRoomController.onReceivedFirePath -= OnReceivedFirePath;
         ExampleRoomController.onTurnCompleted -= OnTurnCompleted;
         ExampleRoomController.onPlayerJoined -= OnPlayerJoined;
         ExampleRoomController.onPlayerQuit -= OnPlayerQuit;
@@ -108,6 +104,7 @@ public class TankGameManager : MonoBehaviour
         ExampleRoomController.onProjectileAdded -= OnProjectileAdded;
         ExampleRoomController.onProjectileRemoved -= OnProjectileRemoved;
         ExampleRoomController.onProjectileUpdated -= OnProjectileUpdated;
+        ExampleRoomController.onWorldGridChanged -= OnWorldGridChanged;
     }
 
     private void OnWorldGridChanged(string index, float value)

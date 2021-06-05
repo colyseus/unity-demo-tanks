@@ -3,6 +3,7 @@ import { Vector3, Vector2 } from "three";
 import logger from "../../helpers/logger";
 import { EnvironmentBuilder } from "../tanks/EnvironmentController";
 
+import { GameRulesSchema } from "./GameRules";
 import { GameRules, weaponList } from "../tanks/rules";
 import { Player, PlayerReadyState } from "./Player";
 import { Projectile } from "./Projectile";
@@ -18,6 +19,7 @@ export enum GameState {
 }
 
 export class TanksState extends Schema {
+    @type(GameRulesSchema) gameRules: GameRulesSchema;
     @type([ Player ]) players = new ArraySchema<Player>();
     @type([Weapon]) weapons = new ArraySchema<Weapon>();
     @type(World) world = new World();
@@ -31,12 +33,15 @@ export class TanksState extends Schema {
 
     @type("string") statusMessage: string;
 
-    isPlayerMoving: boolean = false;
+    isPlayerActing: boolean = false;
+    isWaitingForProjectile: boolean = false;
     creatorId: string = "";
     environmentBuilder: EnvironmentBuilder;
 
     constructor() {
         super();
+
+        this.gameRules = new GameRulesSchema().assign(GameRules);
 
         // initialize all weapons for synchornization
         for (let i = 0; i < weaponList.length; i++) {
@@ -53,7 +58,7 @@ export class TanksState extends Schema {
         this.currentTurn = 0;
         this.turnNumber = 0;
         this.statusMessage = "";
-        this.isPlayerMoving = false;
+        this.isPlayerActing = false;
 
         // Reset players
         this.players.forEach((player) => {
@@ -165,6 +170,8 @@ export class TanksState extends Schema {
             
             // Remove the projectile
             this.removeProjectile(projectile);
+
+            this.isWaitingForProjectile = false;
         }
 
         projectile.coords.assign(path[0]);

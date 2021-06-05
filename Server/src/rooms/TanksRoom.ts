@@ -13,7 +13,7 @@ export class TanksRoom extends Room<TanksState> {
     serverTime: number = 0;
 
     environmentController: EnvironmentBuilder; // Generates and maintains the game's terrain
-    currPlayerMoveWait: number = 0; // Counter to help with the wait before allowing another action after the player has moved
+    currPlayerActionWait: number = 0; // Counter to help with the wait before allowing another action after the player has moved
     
     patchRate = 50; // The ms delay between room state patch updates
 
@@ -124,12 +124,12 @@ export class TanksRoom extends Room<TanksState> {
         switch (this.state.gameState) {
             case GameState.SimulateRound:
                 // Update the counter for player movement
-                if (this.state.isPlayerMoving == true) {
-                    this.currPlayerMoveWait += deltaTimeSeconds;
+                if (this.state.isPlayerActing == true) {
+                    this.currPlayerActionWait += deltaTimeSeconds;
 
-                    if (this.currPlayerMoveWait >= GameRules.MovementTime) {
-                        this.state.isPlayerMoving = false;
-                        this.currPlayerMoveWait = 0;
+                    if (this.currPlayerActionWait >= GameRules.MovementTime && this.state.isWaitingForProjectile == false) {
+                        this.state.isPlayerActing = false;
+                        this.currPlayerActionWait = 0;
                         
                         // Check if the player has used up all their Action Points and end their turn if they have
                         if (this.state.getCurrentTurnPlayer().currentActionPoints <= 0) {
@@ -137,7 +137,7 @@ export class TanksRoom extends Room<TanksState> {
                         }
                     }
                 }
-                
+
                 this.updateProjectiles(deltaTimeSeconds);
                 break;
 
@@ -227,7 +227,7 @@ export class TanksRoom extends Room<TanksState> {
             // Skip if movement is not possible
             if (!player.isMovementAllowed()) { return; }
 
-            this.state.isPlayerMoving = true; // Update the player moving flag to true
+            this.state.isPlayerActing = true; // Update the player acting flag to true
 
             const nextPosition = this.environmentController.GetAvailableSpace(direction, player.coords);
             const canMove: boolean = player.coords.x !== nextPosition.x;
@@ -256,11 +256,14 @@ export class TanksRoom extends Room<TanksState> {
             const player = this.state.players[client.userData.playerId];
 
             // skip if the user does not have enough Action Points to fire
-            if (player.currentActionPoints <= GameRules.FiringActionPointCost) { 
+            if (player.currentActionPoints < GameRules.FiringActionPointCost) { 
                 
                 logger.info(`*** Player does not have enough AP! - ${client.userData.playerId} ***`);
                 return; 
             }
+
+            this.state.isPlayerActing = true; // Update the player acting flag to true
+            this.state.isWaitingForProjectile = true; // Update the wait for projectile flag to true
 
             const barrelForward = message.barrelForward;
             const barrelPosition = message.barrelPosition;
@@ -274,8 +277,6 @@ export class TanksRoom extends Room<TanksState> {
             ) {
                 throw "Error - Get Fire Path - Missing parameter";
             }
-
-            //console.log(`*** Fire Weapon - Barrel Forward =`, barrelForward, `  Barrel Pos = `, barrelPosition, `  Cannon Power = `, cannonPower, ` ***`);
 
             // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
             let projectilePath: Vector_2[] = this.state.getFirePath(
@@ -289,76 +290,6 @@ export class TanksRoom extends Room<TanksState> {
             
             // Consume AP for firing weapon
             player.consumeActionPoints(GameRules.FiringActionPointCost);
-        });
-
-        this.onMessage("getFirePath", (client, message) => {
-            // Check if the player can do the action
-            if (this.canDoAction(client.userData.playerId) == false) {
-                return;
-            }
-
-            const player = this.state.players[client.userData.playerId];
-
-            // skip if the user does not have enough Action Points to fire
-            if (player.currentActionPoints <= GameRules.FiringActionPointCost) { return; }
-
-            const barrelForward = message.barrelForward;
-            const barrelPosition = message.barrelPosition;
-            const cannonPower = message.cannonPower;
-
-            // validate message input
-            if (
-                barrelForward === undefined ||
-                barrelPosition === undefined ||
-                typeof (cannonPower) !== "number"
-            ) {
-                throw "Error - Get Fire Path - Missing parameter";
-            }
-
-            // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
-            let firePath: Vector_2[] = this.state.getFirePath(
-                this.environmentController,
-                new Vector3(barrelForward.x, barrelForward.y, barrelForward.z),
-                new Vector3(barrelPosition.x, barrelPosition.y, barrelPosition.z),
-                cannonPower
-            );
-
-            // Get the player's currently active weapon
-            const activeWeapon = this.state.getActiveWeapon(client.userData.playerId);
-
-            // Send the path to the environment controller to check if any damage is done to terrain or player
-            const damageData = this.environmentController.dealDamage(
-                firePath[firePath.length - 1],
-                activeWeapon.radius,
-                activeWeapon.impactDamage
-            );
-
-            if (damageData) {
-                damageData.updatedPlayers.forEach((updatedPlayer) => {
-                    const player = this.state.players[updatedPlayer.playerId];
-
-                    // Update player HP if there is damage
-                    if (updatedPlayer.damage) {
-                        player.hp -= updatedPlayer.damage;
-                    }
-
-                    if (player.hp <= 0) {
-                        this.state.moveToState(GameState.EndRound);
-                    }
-                });
-            }
-
-            // Consume AP for firing weapon
-            player.consumeActionPoints(GameRules.FiringActionPointCost);
-
-            // TODO: is `damageData` required to be sent here??
-            this.broadcast("receiveFirePath", { firePath, damageData });
-
-            // Check if the player has used up all their Action Points and end their turn if they have
-            if (player.currentActionPoints <= 0) {
-                console.log(`*** Current player has used up all AP ***`);
-                this.state.nextTurn();
-            }
         });
 
         this.onMessage("quitGame", (client, message) => {
@@ -384,7 +315,7 @@ export class TanksRoom extends Room<TanksState> {
      * @returns 
      */
     private canDoAction(playerId: number): boolean {
-        const notMoving = this.state.isPlayerMoving === false;
+        const notMoving = this.state.isPlayerActing === false;
         const goodGameState = (this.state.gameState === GameState.SimulateRound);
 
         return (
