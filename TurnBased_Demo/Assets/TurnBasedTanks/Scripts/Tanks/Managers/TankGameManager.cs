@@ -48,6 +48,8 @@ public class TankGameManager : MonoBehaviour
     private bool _fireChargeInProgress = false;
     private bool _runInitialSetupForRematch = false;
 
+    private GameObject _projectileTarget;
+
     public bool IsOurTurn
     {
         get
@@ -107,6 +109,8 @@ public class TankGameManager : MonoBehaviour
             proj.transform.localPosition = new Vector3(projectile.coords.x, projectile.coords.y);
 
             _projectileObjects.Add(projectile, proj);
+
+            _projectileTarget = proj.gameObject;
         }
         else
         {
@@ -120,6 +124,11 @@ public class TankGameManager : MonoBehaviour
         {
             // Create new projectile object
             ProjectileBase proj = _projectileObjects[projectile];
+
+            if (IsOurTurn == false && proj.gameObject == _projectileTarget)
+            {
+                StartCoroutine(Co_WaitAndRefocusPlayer());
+            }
 
             proj.Explode();
 
@@ -392,7 +401,7 @@ public class TankGameManager : MonoBehaviour
         tank.Move(new EnvironmentBuilder.MapCoordinates((int)newCoords.x, (int)newCoords.y), player == 0);
 
         Vector3 newWorldPos = environmentBuilder.CoordinateToWorldPosition(tank.mapCoords);
-        FocusOnPosition(newWorldPos, false, null);
+        FocusOnPosition(newWorldPos, overrideZoom: false, onArrival: null);
         UpdateUI(ExampleManager.Instance.Room.State);
     }
 
@@ -453,12 +462,12 @@ public class TankGameManager : MonoBehaviour
     public void FocusOnPlayer()
     {
         TankController activeTank = GetTankForCurrentTurn();
-        FocusOnPosition(activeTank.transform.position, true, () => { activeTank.AllowAction(true); });
+        FocusOnPosition(activeTank.transform.position, zoom: 0.75f, false, onArrival: () => { activeTank.AllowAction(true); });
     }
 
-    public void FocusOnPosition(Vector3 worldPosition, bool overrideZoom, Action onArrival)
+    public void FocusOnPosition(Vector3 worldPosition, float? zoom = null, bool overrideZoom = false, Action onArrival = null)
     {
-        cameraManager.FocusOnPosition(worldPosition, overrideZoom, onArrival);
+        cameraManager.FocusOnPosition(worldPosition, targetZoom: zoom, overrideZoom: overrideZoom, onArrival: onArrival);
     }
 
     private void StartTurn()
@@ -478,6 +487,11 @@ public class TankGameManager : MonoBehaviour
         }
 
         HandleInput();
+
+        if (IsOurTurn == false && _projectileTarget)
+        {
+            cameraManager.FocusOnPosition(_projectileTarget.transform.position, 0.5f);
+        }
     }
 
     private void HandleInput()
@@ -669,4 +683,10 @@ public class TankGameManager : MonoBehaviour
         ExampleManager.NetSend("movePlayer", direction);
     }
 
+    private IEnumerator Co_WaitAndRefocusPlayer()
+    {
+        yield return new WaitForSeconds(1.0f);
+
+        FocusOnPlayer();
+    }
 }
