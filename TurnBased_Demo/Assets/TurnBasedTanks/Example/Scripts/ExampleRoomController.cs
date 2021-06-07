@@ -17,10 +17,6 @@ using Vector2 = UnityEngine.Vector2;
 [Serializable]
 public class ExampleRoomController
 {
-    public delegate void OnBeginRound();
-
-    public delegate void OnBeginRoundCountDown();
-
     // Network Events
     //==========================
     /// <summary>
@@ -38,9 +34,9 @@ public class ExampleRoomController
     //Custom game delegate functions
     //======================================
     public delegate void OnRoomStateChanged(TanksState state, bool isFirstState);
+    public static event OnRoomStateChanged onRoomStateChanged;
 
-
-    public delegate void OnUserStateChanged(Player state/*MapSchema<string> changes*/);
+    public delegate void OnUserStateChanged(Player state);
 
     /// <summary>
     ///     Event for when a NetworkEntity is added to the room.
@@ -74,10 +70,6 @@ public class ExampleRoomController
     private Dictionary<string, Action<ExampleNetworkedEntity>> _creationCallbacks =
         new Dictionary<string, Action<ExampleNetworkedEntity>>();
 
-
-    //public delegate void OnInitialSetup(int playerTurnId, int currentPlayerTurn, int currentAP, string[] playerNames, int[] playerHP, WeaponModel currentWeapon, List<List<int>> mapMatrix, bool challengerOnline);
-    //public static event OnInitialSetup onInitialSetup;
-
     public delegate void OnWorldChanged(List<DataChange> changes);
     public static event OnWorldChanged onWorldChanged;
 
@@ -95,9 +87,6 @@ public class ExampleRoomController
 
     public delegate void OnProjectileUpdated(Projectile projectile, List<DataChange> changes);
     public static event OnProjectileUpdated onProjectileUpdated;
-
-    public delegate void OnSelectedWeaponUpdated(WeaponModel selectedWeapon);
-    public static event OnSelectedWeaponUpdated onSelectedWeaponUpdated;
 
     public delegate void OnTankMoved(int player, Tanks.Vector2 newCoords);
     public static OnTankMoved onTankMoved;
@@ -259,11 +248,6 @@ public class ExampleRoomController
 
         return null;
     }
-
-    public static event OnRoomStateChanged onRoomStateChanged;
-    public static event OnBeginRoundCountDown onBeginRoundCountDown;
-    public static event OnBeginRound onBeginRound;
-    //public static event OnUserStateChanged OnCurrentUserStateChanged;
 
     /// <summary>
     ///     Set the dependencies.
@@ -441,9 +425,9 @@ public class ExampleRoomController
 
         //Custom game logic
         //========================
-        _room.State.world.OnChange += changes => onWorldChanged?.Invoke(changes);
+        _room.State.world.OnChange += OnWorldChange;
 
-        _room.State.world.grid.OnChange += (index, value) => onWorldGridChanged?.Invoke(index, value);
+        _room.State.world.grid.OnChange += OnWorldGridChange;
 
         _room.State.players.OnAdd += OnUserAdd;
         _room.State.players.OnRemove += OnUserRemove;
@@ -456,6 +440,16 @@ public class ExampleRoomController
 
         _room.colyseusConnection.OnError += Room_OnError;
         _room.colyseusConnection.OnClose += Room_OnClose;
+    }
+
+    private void OnWorldChange(List<DataChange> changes)
+    {
+        onWorldChanged?.Invoke(changes);
+    }
+
+    private void OnWorldGridChange(string index, float value)
+    {
+        onWorldGridChanged?.Invoke(index, value);
     }
 
     private void OnLeaveRoom(WebSocketCloseCode code)
@@ -487,15 +481,17 @@ public class ExampleRoomController
             return;
         }
 
-        //_room.State.networkedEntities.OnAdd -= OnEntityAdd;
-        //_room.State.networkedEntities.OnRemove -= OnEntityRemoved;
-        _room.State.players/*networkedUsers*/.OnAdd -= OnUserAdd;
-        _room.State.players/*networkedUsers*/.OnRemove -= OnUserRemove;
+        _room.OnStateChange -= OnStateChangeHandler;
+
+        _room.State.world.OnChange -= OnWorldChange;
+        _room.State.world.grid.OnChange -= OnWorldGridChange;
+        _room.State.projectiles.OnAdd -= OnProjectileAdd;
+        _room.State.projectiles.OnRemove -= OnProjectileRemove;
+        _room.State.players.OnAdd -= OnUserAdd;
+        _room.State.players.OnRemove -= OnUserRemove;
 
         _room.colyseusConnection.OnError -= Room_OnError;
         _room.colyseusConnection.OnClose -= Room_OnClose;
-
-        _room.OnStateChange -= OnStateChangeHandler;
 
         _room.OnLeave -= OnLeaveRoom;
 
@@ -520,7 +516,6 @@ public class ExampleRoomController
     /// <param name="roomId">ID of the room to join.</param>
     public async Task JoinRoomId(string roomId, bool isNewJoin)
     {
-        LSLog.Log($"Joining Room ID {roomId}....");
         ClearRoomHandlers();
 
         try
@@ -528,10 +523,9 @@ public class ExampleRoomController
             while (_room == null || !_room.colyseusConnection.IsOpen)
             {
                 Dictionary<string, object> options = new Dictionary<string, object>();
-                //if (isNewJoin)
-                //{
-                    options.Add("joiningId", ExampleManager.Instance.UserName);
-                //}
+
+                options.Add("joiningId", ExampleManager.Instance.UserName);
+
                 _room = await _client.JoinById<Tanks.TanksState>(roomId, options);
 
                 if (_room == null || !_room.colyseusConnection.IsOpen)
@@ -548,7 +542,6 @@ public class ExampleRoomController
         {
             LSLog.LogError(ex.Message);
             LSLog.LogError("Failed to join room");
-            //await CreateSpecificRoom(_client, roomName, roomId, onJoin);
         }
     }
 
@@ -559,9 +552,6 @@ public class ExampleRoomController
     /// <param name="key">The entity's key</param>
     private async void OnEntityAdd(ExampleNetworkedEntity entity, string key)
     {
-        Debug.Log(
-            $"Entity [{entity.__refId} | {entity.id}] add: x => {entity.xPos}, y => {entity.yPos}, z => {entity.zPos}");
-
         _entities.Add(entity.id, entity);
 
         //Creation ID is only Registered with the owner so only owners callback will be triggered
@@ -617,8 +607,6 @@ public class ExampleRoomController
     /// <param name="key">The user key</param>
     private void OnUserAdd(int key, Tanks.Player user)
     {
-        //LSLog.LogImportant($"user [{user.__refId} | {user.sessionId} | key {key}] Joined");
-
         // Add "player" to map of players
         _users.Add(key, user);
 
@@ -630,18 +618,6 @@ public class ExampleRoomController
         // On entity update...
         user.OnChange += changes =>
         {
-            //LSLog.LogImportant($"User.OnChange!", LSLog.LogColor.cyan);
-            //user.updateHash = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-
-            //// If the change is for our current user then fire the event with the attributes that changed
-            //if (ExampleManager.Instance.CurrentUser != null &&
-            //    string.Equals(ExampleManager.Instance.CurrentUser.sessionId, user.sessionId))
-            //{
-            //    OnCurrentUserStateChanged?.Invoke(user/*.attributes*/);
-            //}
-            
-            //LSLog.LogImportant($"Player Change - Player = {user.sessionId}/{user.playerId}/{user.name}", LSLog.LogColor.grey);
-
             onPlayerChange?.Invoke((int)user.playerId, changes);
         };
     }

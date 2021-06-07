@@ -102,12 +102,12 @@ public class GameUIController : MonoBehaviour
     {
         string text = "";
         int gridValue;
-        for (int y = environment.MapHeight - 1/*map[0].Count - 1*/; y >= 0; --y)
+        for (int y = environment.MapHeight - 1; y >= 0; --y)
         {
-            for (int x = 0; x < environment.MapWidth/*map.Count*/; ++x)
+            for (int x = 0; x < environment.MapWidth; ++x)
             {
                 gridValue = (int)environment.GetGridValueAt(x, y, out int idx);
-                string item = gridValue.ToString(); /*map[x][y].ToString();*/
+                string item = gridValue.ToString(); 
                 switch (gridValue)
                 {
                     case (int)EnvironmentBuilder.eMapItem.EMPTY:

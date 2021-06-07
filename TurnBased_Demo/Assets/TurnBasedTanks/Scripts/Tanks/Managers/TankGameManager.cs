@@ -17,6 +17,8 @@ public class TankGameManager : MonoBehaviour
         PLAYER_2
     }
 
+    public static TankGameManager Instance { get; private set; }
+
     public eTurn CurrentTurn { get; private set; }
 
     public EnvironmentBuilder Builder => environmentBuilder;
@@ -35,18 +37,16 @@ public class TankGameManager : MonoBehaviour
     private TankController playerOneTank;
     private TankController playerTwoTank;
 
-    private bool fireChargeInProgress = false;
-    public static TankGameManager Instance { get; private set; }
-
     public int OurPlayerID { get; private set; } = -1;
     public string OurPlayerName { get; private set; }
     public string EnemyName { get; private set; }
     public string GeneralMessage { get; private set; }
     public bool IsGameOver { get; private set; } = false;
 
-    private Dictionary<string, string> attributeUpdate = new Dictionary<string, string>();
-
     private Dictionary<Projectile, ProjectileBase> _projectileObjects = new Dictionary<Projectile, ProjectileBase>();
+
+    private bool _fireChargeInProgress = false;
+    private bool _runInitialSetupForRematch = false;
 
     public bool IsOurTurn
     {
@@ -65,11 +65,6 @@ public class TankGameManager : MonoBehaviour
         }
 
         Instance = this;
-    }
-
-    IEnumerator Start()
-    {
-        yield return new WaitForFixedUpdate();
     }
 
     void OnEnable()
@@ -152,12 +147,8 @@ public class TankGameManager : MonoBehaviour
 
     private void OnPlayerUpdated(int playerId, List<DataChange> changes)
     {
-        //LSLog.LogImportant($"Player Updated - Player Id = {playerId}", LSLog.LogColor.grey);
-
         for (int i = 0; i < changes.Count; i++)
         {
-            //LSLog.LogImportant($"\tField = {changes[i].Field} Prev = {changes[i].PreviousValue}  New = {changes[i].Value}", LSLog.LogColor.grey);
-            
             UpdatePlayer(playerId, changes[i]);
         }
     }
@@ -213,10 +204,6 @@ public class TankGameManager : MonoBehaviour
                 }
 
                 break;
-            //default:
-            //    LSLog.Log($"Unsupported update field - \"{change.Field}\"", LSLog.LogColor.yellow);
-
-                break;
         }
 
         UpdateUI(state);
@@ -239,9 +226,9 @@ public class TankGameManager : MonoBehaviour
     {
         //LSLog.LogImportant($"On Room State Changed - Is First State = {isFirstState}", LSLog.LogColor.yellow);
 
-        if (isFirstState || IsGameOver && state.turnNumber == 0)
+        if (isFirstState || _runInitialSetupForRematch)
         {// First state update; run initial setup
-            
+
             InitialSetup(state);
         }
         
@@ -273,7 +260,14 @@ public class TankGameManager : MonoBehaviour
         {
             if (string.Equals(changes[i].Field, "grid"))
             {
+                // We got a new world
                 ReceiveWorldMap(ExampleManager.Instance.Room.State.world);
+
+                // If we're currently in a Game Over State it means we're starting a new round of play
+                if (IsGameOver)
+                {
+                    _runInitialSetupForRematch = true;
+                }
             }
 
         }
@@ -302,9 +296,8 @@ public class TankGameManager : MonoBehaviour
 
     private void InitialSetup(TanksState state)
     {
-        LSLog.LogImportant($"Initial Setup", LSLog.LogColor.lime);
-
         IsGameOver = false;
+        _runInitialSetupForRematch = false;
 
         // Determine our player Id
         state.players.ForEach((player) =>
@@ -327,7 +320,7 @@ public class TankGameManager : MonoBehaviour
         UpdatePlayerNames(state);
         UpdatePlayerHP(state);
         
-        fireChargeInProgress = false;
+        _fireChargeInProgress = false;
 
         uiController.ToggleLoadingCover(false);
 
@@ -470,7 +463,7 @@ public class TankGameManager : MonoBehaviour
 
     private void StartTurn()
     {
-        fireChargeInProgress = false;
+        _fireChargeInProgress = false;
         GetTankForCurrentTurn().BeginTurn();
         GetTankForCurrentTurn().AllowAction(false);
         
@@ -505,7 +498,7 @@ public class TankGameManager : MonoBehaviour
 
         activeTank.CheckHotkeys();
 
-        if (fireChargeInProgress == false && Input.GetAxisRaw("Horizontal") != 0.0f)
+        if (_fireChargeInProgress == false && Input.GetAxisRaw("Horizontal") != 0.0f)
         {
             MoveTank(Input.GetAxisRaw("Horizontal"));
         }
@@ -522,24 +515,24 @@ public class TankGameManager : MonoBehaviour
 
         if (GetCurrentTurnAP(ExampleManager.Instance.Room.State) >= GameRules.FiringAPCost && Input.GetMouseButtonDown(0))
         {
-            fireChargeInProgress = true;
+            _fireChargeInProgress = true;
             GetTankForCurrentTurn().StartChargeCannon();
         }
 
         if (Input.GetMouseButtonDown(1))
         {
-            fireChargeInProgress = false;
+            _fireChargeInProgress = false;
             GetTankForCurrentTurn().AbortCharge();
         }
 
         if (Input.GetMouseButtonUp(0) && GetTankForCurrentTurn().CurrentAP >= GameRules.FiringAPCost)
         {
-            if (fireChargeInProgress)
+            if (_fireChargeInProgress)
             {
                 AttemptWeaponFire();
             }
 
-            fireChargeInProgress = false;
+            _fireChargeInProgress = false;
             GetTankForCurrentTurn().AbortCharge();
         }
 

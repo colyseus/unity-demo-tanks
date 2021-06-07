@@ -13,7 +13,7 @@ export class TanksRoom extends Room<TanksState> {
     serverTime: number = 0;
 
     environmentController: EnvironmentBuilder; // Generates and maintains the game's terrain
-    currPlayerActionWait: number = 0; // Counter to help with the wait before allowing another action after the player has moved
+    currPlayerActionWait: number = 0; // Counter to help with the wait before allowing another action
     
     patchRate = 50; // The ms delay between room state patch updates
 
@@ -62,13 +62,10 @@ export class TanksRoom extends Room<TanksState> {
 
     // Callback when a client has joined the room
     onJoin(client: Client, options: any) {
-        logger.info(`Client joined! - ${client.sessionId} ***`); console.log(options);
-
+       
         const username = options["joiningId"] || options["creatorId"];
 
         const isCreator = this.state.creatorId === username; 
-
-        logger.info(`*** On Join - Username = ${username} - Is Creator = ${isCreator} ***`);
 
         // attach custom data to the client.
         client.userData = {
@@ -100,7 +97,7 @@ export class TanksRoom extends Room<TanksState> {
 
         // Set team0 / team1 key on room's metadata
         this.setMetadata({
-            [`team${player.playerId}`]: player.name// client.sessionId
+            [`team${player.playerId}`]: player.name
         });
     }
 
@@ -307,6 +304,9 @@ export class TanksRoom extends Room<TanksState> {
      * Resets data for a new round of play
      */
     private resetForNewRound() {
+
+        this.currPlayerActionWait = 0;
+
         // Generate new environment
         this.environmentController.GenerateEnvironment(50, 10);
 
@@ -335,7 +335,7 @@ export class TanksRoom extends Room<TanksState> {
     /**
      * Checks if players want a rematch if they have a 'readyState' of "watsRematch"
      */
-    private checkForRematch() {
+    private checkForRematch(): boolean {
         let numPlayersReady: number = 0;
 
         this.state.players.forEach((player) => {
@@ -365,20 +365,20 @@ export class TanksRoom extends Room<TanksState> {
 
     private onPlayerQuit(player: Player) {
 
-        logger.info(`*** Player ${player.name} | ${player.playerId} has quit the game ***`);
+        this.state.statusMessage = "";
 
         // Flag for if the room should disconnect after this player has quit
         let disconnectRoom: boolean = false;
 
         // Has the creator quit before a challenger has joined?
         if(this.metadata.team0 && this.metadata.team1 == null) {
-            logger.info(`*** Creator has quit game before a challenger has arrived ***`);
+            
             disconnectRoom = true;
         }
 
         // No other users are in the room so disconnect
         if(this.state.inProcessOfQuitingGame && this.state.quitPlayers.size >= 1 ) {
-            logger.info(`*** Left room after someone else already quit! ***`);
+            
             disconnectRoom = true;
         }
 

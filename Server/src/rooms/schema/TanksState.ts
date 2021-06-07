@@ -61,6 +61,7 @@ export class TanksState extends Schema {
         this.turnNumber = 0;
         this.statusMessage = "";
         this.isPlayerActing = false;
+        this.isWaitingForProjectile = false;
 
         // Reset players
         this.players.forEach((player) => {
@@ -88,8 +89,6 @@ export class TanksState extends Schema {
      * @param {GameState} newState The new state to move to
      */
     moveToState (nextGameState: GameState) {
-
-        logger.silly(`*** Move to State: From ${this.gameState} to ${nextGameState} ***`);
 
         this.previousGameState = this.gameState;
         this.gameState = nextGameState;

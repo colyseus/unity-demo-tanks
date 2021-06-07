@@ -29,7 +29,7 @@ export class EnvironmentBuilder
         this.state.world.height = height;
 
         this.state.world.grid = new MapSchema<number>();
-        
+
         let randomSeed: number = Math.random() * 50;
         let variation: number = 1.5;
         let noise = fastNoise.Create();
@@ -89,7 +89,7 @@ export class EnvironmentBuilder
                 //We have nothing in this square
                 this.SetGridValueAt(oneX, y, MapIconValues.PLAYER_1);
                 playerOnePlaced = true;
-                this.SetPlayerPosition(0, new Vector2(oneX, y));
+                this.SetPlayerPosition(0, new Vector2(oneX, y), false);
             }
 
             if (gridTwoVal === MapIconValues.EMPTY && !playerTwoPlaced)
@@ -97,7 +97,7 @@ export class EnvironmentBuilder
                 //We have nothing in this square
                 this.SetGridValueAt(twoX, y, MapIconValues.PLAYER_2);
                 playerTwoPlaced = true;
-                this.SetPlayerPosition(1, new Vector2(twoX, y));
+                this.SetPlayerPosition(1, new Vector2(twoX, y), false);
             }
         }
     }
@@ -115,11 +115,11 @@ export class EnvironmentBuilder
         return this.state.players[playerId].coords;
     }
 
-    public SetPlayerPosition(playerId: number, coords: Vector2Like) {
+    public SetPlayerPosition(playerId: number, coords: Vector2Like, changeGridAtPrev: boolean = true) {
         const player = this.state.players[playerId];
         const previousPos = this.GetPlayerPosition(playerId);
 
-        if (previousPos && previousPos.x && previousPos.y) {
+        if (previousPos && previousPos.x && previousPos.y && changeGridAtPrev) {
             this.SetGridValueAt(previousPos.x, previousPos.y, MapIconValues.EMPTY);
         }
 
