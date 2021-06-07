@@ -154,6 +154,11 @@ export class TanksRoom extends Room<TanksState> {
 
     }
 
+    /**
+     * Updates any projectiles along their path
+     * @param deltaTime Server delta time in seconds
+     * @returns 
+     */
     private updateProjectiles(deltaTime: number){
 
         if(this.state.projectiles == null) {
@@ -166,6 +171,9 @@ export class TanksRoom extends Room<TanksState> {
         });
     }
 
+    /**
+     * Registers handlers for messages expected to come from the client
+     */
     private registerMessageHandlers() {
 
         // Set the callback for the "ping" message for tracking server-client latency
@@ -173,6 +181,9 @@ export class TanksRoom extends Room<TanksState> {
             client.send(0, { serverTime: this.serverTime });
         });
 
+        /**
+         * Message handler for when a player wants a rematch
+         */
         this.onMessage("requestRematch", (client) => {
 
             const player = this.state.players[client.userData.playerId];
@@ -183,6 +194,9 @@ export class TanksRoom extends Room<TanksState> {
             }
         });
 
+        /**
+         * Message handler for when a player elects to skip their remaining turn
+         */
         this.onMessage("skipTurn", (client, message) => {
             // Check if the player can do the action
             if (this.canDoAction(client.userData.playerId) == false) {
@@ -192,6 +206,9 @@ export class TanksRoom extends Room<TanksState> {
             this.state.nextTurn();
         });
 
+        /**
+         * Message handler when a player changes their selected weapon
+         */
         this.onMessage("changeWeapon", (client: Client, message) => {
             // Check if the player can do the action
             if (this.canDoAction(client.userData.playerId) == false) {
@@ -201,6 +218,9 @@ export class TanksRoom extends Room<TanksState> {
             this.state.switchPlayerWeapon(client.userData.playerId, message);
         });
 
+        /** 
+         * Message handler for when a player adjusts the aim angle of their tank
+         */
         this.onMessage("setAimAngle", (client: Client, message) => {
             // Check if the player can do the action
             if (this.canDoAction(client.userData.playerId) == false) {
@@ -210,6 +230,9 @@ export class TanksRoom extends Room<TanksState> {
             this.state.setAimAngle(client.userData.playerId, message);
         });
 
+        /**
+         * Message handler for when a player wants to move their tank
+         */
         this.onMessage("movePlayer", (client: Client, direction) => {
             // Skip if the player cannot do the action
             if (this.canDoAction(client.userData.playerId) === false) { return; }
@@ -363,6 +386,10 @@ export class TanksRoom extends Room<TanksState> {
         }
     }
 
+    /**
+     * Logic to handle player quits and when to disconnect the room
+     * @param player The player who has quit the match
+     */
     private onPlayerQuit(player: Player) {
 
         this.state.statusMessage = "";

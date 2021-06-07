@@ -120,6 +120,12 @@ export class TanksState extends Schema {
         return this.players[this.currentTurn];
     }
 
+    /**
+     * Creates a new projectile and adds it the projectiles collection
+     * @param playerId The player the projectile will belong to
+     * @param path The trajectory the projectile will take
+     * @returns The new Projectile instance
+     */
     addNewProjectile(playerId: number, path: Vector2[]): Projectile {
 
         if(path == null || path.length == 0) {
@@ -148,6 +154,10 @@ export class TanksState extends Schema {
         return projectile;
     }
 
+    /**
+     * Applies damage to the terrain and any players within the impact radius of the projectile
+     * @param projectile The projectile causing the damage
+     */
     private dealEnvironmentAndPlayerDamage(projectile: Projectile) {
         // Get the player's currently active weapon
         const activeWeapon = this.getActiveWeapon(projectile.playerId);
