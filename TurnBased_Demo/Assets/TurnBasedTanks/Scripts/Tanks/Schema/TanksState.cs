@@ -38,5 +38,8 @@ namespace Tanks {
 
 		[Type(9, "string")]
 		public string statusMessage = default(string);
+
+		[Type(10, "boolean")]
+		public bool inProcessOfQuitingGame = default(bool);
 	}
 }

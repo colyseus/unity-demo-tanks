@@ -4,7 +4,7 @@ import { Vector2 } from "./Vector2";
 
 export enum PlayerReadyState {
     WAITING = "waiting",
-    READY = "ready",
+    REMATCH = "wantsRematch",
 }
 
 export class Player extends Schema {

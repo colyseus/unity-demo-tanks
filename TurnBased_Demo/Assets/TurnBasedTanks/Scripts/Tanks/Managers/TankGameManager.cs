@@ -77,11 +77,6 @@ public class TankGameManager : MonoBehaviour
         // Subscribe to events
         ExampleRoomController.onRoomStateChanged += OnRoomStateChanged;
         ExampleRoomController.onTankMoved += OnPlayerMove;
-        ExampleRoomController.onTurnCompleted += OnTurnCompleted;
-        ExampleRoomController.onPlayerJoined += OnPlayerJoined;
-        ExampleRoomController.onPlayerQuit += OnPlayerQuit;
-        ExampleRoomController.onPlayerLeave += OnPlayerLeft;
-
         ExampleRoomController.onWorldChanged += OnWorldChanged;
         ExampleRoomController.onPlayerChange += OnPlayerUpdated;
         ExampleRoomController.onProjectileAdded += OnProjectileAdded;
@@ -94,11 +89,6 @@ public class TankGameManager : MonoBehaviour
         // Unsubscribe from events
         ExampleRoomController.onRoomStateChanged -= OnRoomStateChanged;
         ExampleRoomController.onTankMoved -= OnPlayerMove;
-        ExampleRoomController.onTurnCompleted -= OnTurnCompleted;
-        ExampleRoomController.onPlayerJoined -= OnPlayerJoined;
-        ExampleRoomController.onPlayerQuit -= OnPlayerQuit;
-        ExampleRoomController.onPlayerLeave -= OnPlayerLeft;
-
         ExampleRoomController.onWorldChanged -= OnWorldChanged;
         ExampleRoomController.onPlayerChange -= OnPlayerUpdated;
         ExampleRoomController.onProjectileAdded -= OnProjectileAdded;
@@ -232,30 +222,6 @@ public class TankGameManager : MonoBehaviour
         UpdateUI(state);
     }
 
-    /// <summary>
-    /// Callback to handle another player joining while we are connected to the room
-    /// </summary>
-    /// <param name="playerId"></param>
-    /// <param name="playerName"></param>
-    private void OnPlayerJoined(int playerId, string playerName)
-    {
-        if (playerId == OurPlayerID)
-        {
-            return;
-        }
-
-        EnemyName = playerName;
-
-        uiController.UpdatePlayerNames(OurPlayerName, playerName);
-        uiController.ToggleOnlineIndicator(true);
-
-        UpdateUI(ExampleManager.Instance.Room.State);
-    }
-
-    /// <summary>
-    /// Callback to handle the other player quitting while we are connected to the room
-    /// </summary>
-    /// <param name="quittingPlayerName"></param>
     private void OnPlayerQuit(string quittingPlayerName)
     {
         string quitMsg = IsGameOver ? $"{quittingPlayerName} has left" : $"{quittingPlayerName} Surrendered!";
@@ -266,70 +232,6 @@ public class TankGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Callback to handle when a player has left the room
-    /// </summary>
-    private void OnPlayerLeft()
-    {
-        uiController.ToggleOnlineIndicator(false);
-    }
-
-    private void SelectedWeaponUpdated(int playerId, int weaponIndex = 0)
-    {
-        Weapon weapon = ExampleManager.Instance.Room.State.weapons[weaponIndex];
-
-        if (OurPlayerID == 0)
-        {
-            playerOneTank.UpdateSelectedWeapon(weapon);
-        }
-        else
-        {
-            playerTwoTank.UpdateSelectedWeapon(weapon);
-        }
-
-        UpdateUI(ExampleManager.Instance.Room.State);
-    }
-
-    /// <summary>
-    /// Callback to handle the server response when we want to change our currently selected weapon
-    /// </summary>
-    /// <param name="selectedWeapon"></param>
-    //private void OnSelectedWeaponUpdated(WeaponModel selectedWeapon)
-    //{
-    //    if (OurPlayerID == 0)
-    //    {
-    //        playerOneTank.UpdateSelectedWeapon(selectedWeapon);
-    //    }
-    //    else
-    //    {
-    //        playerTwoTank.UpdateSelectedWeapon(selectedWeapon);
-    //    }
-
-    //    UpdateUI(ExampleManager.Instance.Room.State);
-    //}
-
-    /// <summary>
-    /// Callback to handle an inbound fire path
-    /// </summary>
-    /// <param name="player">The turn Id of the player that fired/requested the fire path</param>
-    /// <param name="remainingAP">The remaining Action Points of the player</param>
-    /// <param name="firePath">The path of the projectile</param>
-    /// <param name="damageData">DamageData result at the end of the fire path</param>
-    //private void OnReceivedFirePath(int player, int remainingAP, List<Vector3> firePath, DamageData damageData)
-    //{
-    //    _waitingForFirePath = false;
-    //    CancelInvoke("ResetWaitForFirePath");
-
-    //    TankController tank = player == 0 ? playerOneTank : playerTwoTank;
-    //    tank.CurrentAP = remainingAP;
-
-    //    UpdateUI(ExampleManager.Instance.Room.State);
-
-    //    CannonController.CannonFirePath cannonFirePath = new CannonController.CannonFirePath(firePath.ToArray());
-
-    //    GetTankForCurrentTurn().Fire(cannonFirePath, damageData);
-    //}
-
-    /// <summary>
     /// Callback for the room state change
     /// </summary>
     /// <param name="attributes"></param>
@@ -337,7 +239,7 @@ public class TankGameManager : MonoBehaviour
     {
         //LSLog.LogImportant($"On Room State Changed - Is First State = {isFirstState}", LSLog.LogColor.yellow);
 
-        if (isFirstState)
+        if (isFirstState || IsGameOver && state.turnNumber == 0)
         {// First state update; run initial setup
             
             InitialSetup(state);
@@ -347,28 +249,30 @@ public class TankGameManager : MonoBehaviour
 
         UpdateUI(state);
 
+        // Current turn has changed
         if (!isFirstState && (int)CurrentTurn != (int)state.currentTurn)
         {
-            LSLog.LogImportant($"Turn Changed! - {state.currentTurn}", LSLog.LogColor.yellow);
-
             SetCurrentTurn((int)state.currentTurn);
 
             StartTurn();
+        }
+
+        // Check if someone has quit the match
+        if (state.inProcessOfQuitingGame)
+        {
+            // Get the name of the other player that quit
+            int otherPlayerId = OurPlayerID == 0 ? 1 : 0;
+
+            OnPlayerQuit(state.players[otherPlayerId].name);
         }
     }
 
     private void OnWorldChanged(List<DataChange> changes)
     {
-        LSLog.LogImportant($"World Changed!", LSLog.LogColor.lime);
         for (int i = 0; i < changes.Count; i++)
         {
-            //LSLog.LogImportant($"\tField = {changes[i].Field}", LSLog.LogColor.lime);
-
             if (string.Equals(changes[i].Field, "grid"))
             {
-                //LSLog.LogImportant($"Update world grid! || {JsonUtility.ToJson(changes[i])}");
-                //LSLog.Log($"World Grid - grid count = {ExampleManager.Instance.Room.State.world.grid.Count}");
-
                 ReceiveWorldMap(ExampleManager.Instance.Room.State.world);
             }
 
@@ -382,27 +286,6 @@ public class TankGameManager : MonoBehaviour
     private void ReceiveWorldMap(World world)
     {
         environmentBuilder.BuildEnvironment(world);
-    }
-
-    /// <summary>
-    /// Callback to handle the end of a player's turn
-    /// </summary>
-    /// <param name="wasSkip">Flag for if the turn ended because a player skipped their turn</param>
-    private void OnTurnCompleted(bool wasSkip)
-    {
-        StartCoroutine(Co_DelayTurnEnd(wasSkip ? 0 : 2.0f));
-    }
-
-    /// <summary>
-    /// Wait the delay before transitioning to next turn
-    /// </summary>
-    /// <param name="delay"></param>
-    /// <returns></returns>
-    IEnumerator Co_DelayTurnEnd(float delay)
-    {
-        yield return new WaitForSecondsRealtime(delay);
-
-        EndTurn();
     }
 
     private Player GetChallengerPlayer(TanksState state)
@@ -451,55 +334,6 @@ public class TankGameManager : MonoBehaviour
         StartTurn();
 
         ExampleRoomController.onWorldGridChanged += OnWorldGridChanged;
-    }
-
-    /// <summary>
-    /// Callback to handle the data that comes in for the initial setup after connecting to a room or for a rematch
-    /// </summary>
-    /// <param name="playerTurnId">The turn Id of this client</param>
-    /// <param name="playerTurn">The current player turn number</param>
-    /// <param name="currentAP">The remaining Action Points of the player whose current turn it is</param>
-    /// <param name="playerNames">Array of player names</param>
-    /// <param name="playerHP">Array of player Hit Points</param>
-    /// <param name="currentWeapon">Our tank's current weapon</param>
-    /// <param name="mapMatrix">The current terrain matrix</param>
-    private void OnInitialSetup(int playerTurnId, int playerTurn, int currentAP, string[] playerNames, int[] playerHP, WeaponModel currentWeapon, List<List<int>> mapMatrix, bool challengerOnline)
-    {
-        LSLog.LogImportant($"On Initial Setup", LSLog.LogColor.lime);
-
-        //IsGameOver = false;
-
-        // a negative playerTurnId indicates the setup data is for a rematch
-        //if (playerTurnId >= 0)
-        //{
-        //    OurPlayerID = playerTurnId;
-        //}
-
-        //ReceiveWorldMap(mapMatrix);
-
-        //SetCurrentTurn(playerTurn);
-
-        //TankController ourTank = GetOurTank();
-
-        //ourTank.UpdateSelectedWeapon(currentWeapon);
-
-        // Set the AP for the active tank as received from the server
-        GetTankForCurrentTurn().CurrentAP = currentAP;
-        GetTankForCurrentTurn().ignoreAPReset = true;
-
-        //uiController.HideGameOverUI();
-        //uiController.ToggleOnlineIndicator(challengerOnline);
-
-        //UpdatePlayerNames(playerNames);
-        //UpdatePlayerHP(playerHP);
-        //UpdateUI(ExampleManager.Instance.Room.State);
-
-        //_waitingForFirePath = false;
-        //fireChargeInProgress = false;
-
-        StartTurn();
-
-        //uiController.ToggleLoadingCover(false);
     }
 
     /// <summary>
@@ -574,10 +408,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void RequestRematch()
     {
-        attributeUpdate.Clear();
-        attributeUpdate.Add("readyState", "ready");
-
-        ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.CurrentUser.sessionId, attributesToSet = attributeUpdate });
+        ExampleManager.NetSend("requestRematch");
     }
 
     /// <summary>
@@ -585,7 +416,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void QuitMatch()
     {
-        ExampleManager.CustomServerMethod("quitGame", new object[] {});
+        ExampleManager.NetSend("quitGame");
 
         ReturnToLobby();
     }
@@ -607,6 +438,9 @@ public class TankGameManager : MonoBehaviour
         uiController.ShowGameOverUI(winningPlayer);
 
         IsGameOver = true;
+
+        // Unsubscribe from grid changes until the next game gets initialized
+        ExampleRoomController.onWorldGridChanged -= OnWorldGridChanged;
     }
 
     /// <summary>
@@ -627,17 +461,6 @@ public class TankGameManager : MonoBehaviour
     {
         TankController activeTank = GetTankForCurrentTurn();
         FocusOnPosition(activeTank.transform.position, true, () => { activeTank.AllowAction(true); });
-    }
-
-    public void EndTurn()
-    {
-        fireChargeInProgress = false;
-        GetTankForCurrentTurn().AbortCharge();
-        GetTankForCurrentTurn().ignoreAPReset = false;
-        CurrentTurn = CurrentTurn == eTurn.PLAYER_1 ? eTurn.PLAYER_2 : eTurn.PLAYER_1;
-        StartTurn();
-
-        UpdateUI(ExampleManager.Instance.Room.State);
     }
 
     public void FocusOnPosition(Vector3 worldPosition, bool overrideZoom, Action onArrival)
@@ -747,13 +570,7 @@ public class TankGameManager : MonoBehaviour
     /// <param name="aimAngle"></param>
     private void SendAimAngle(float aimAngle)
     {
-        //attributeUpdate.Clear();
-
-        //attributeUpdate.Add("aimAngle", aimAngle.ToString());
-
         ExampleManager.NetSend("setAimAngle", aimAngle);
-
-        //ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.Room.SessionId/*CurrentUser.sessionId*/, attributesToSet = attributeUpdate });
     }
 
     /// <summary>
@@ -818,9 +635,9 @@ public class TankGameManager : MonoBehaviour
 
     private void UpdateUI(TanksState state)
     {
-        uiController.UpdateActionPoints(GetCurrentTurnAP(state)/*GetTankForCurrentTurn().CurrentAP*/);
-        uiController.SetActiveWeaponName(IsOurTurn ? GetCurrentTurnWeapon(state).name/*GetTankForCurrentTurn().ActiveWeaponData.name*/ : "");
-        uiController.SetCurrentPlayer(GetCurrentTurnPlayer(state).name/*IsOurTurn ? OurPlayerName : EnemyName*/);
+        uiController.UpdateActionPoints(GetCurrentTurnAP(state));
+        uiController.SetActiveWeaponName(GetCurrentTurnWeapon(state).name);
+        uiController.SetCurrentPlayer(GetCurrentTurnPlayer(state).name);
 
         if (environmentBuilder.mapMatrix != null)
             uiController.UpdateMap(environmentBuilder);
@@ -857,61 +674,6 @@ public class TankGameManager : MonoBehaviour
     public void AttemptMove(int direction)
     {
         ExampleManager.NetSend("movePlayer", direction);
-    }
-
-    /// <summary>
-    /// For when a projectile has reached the end of its path and explodes.  Apply the damage data to the terrain and any affected players.
-    /// </summary>
-    /// <param name="damageData"></param>
-    public void RegisterExplosion(DamageData damageData)
-    {
-        // Update environment
-        environmentBuilder.DamageDealt(damageData);
-
-        // Update tanks
-        if (damageData != null && damageData.updatedPlayers != null)
-        {
-            for (int i = 0; i < damageData.updatedPlayers.Count; i++)
-            {
-                UpdatedPlayer updatedPlayer = damageData.updatedPlayers[i];
-                
-                uiController.UpdateHitPoints(updatedPlayer.remainingHP, updatedPlayer.playerId == OurPlayerID);
-                
-                if (updatedPlayer.playerId == 0)
-                {
-                    if (updatedPlayer.playerPos != null)
-                    {
-                        // Move the tank to the updated position
-                        playerOneTank.MoveToNewCoordinates(new EnvironmentBuilder.MapCoordinates((int)((Vector2)updatedPlayer.playerPos).x, (int)((Vector2)updatedPlayer.playerPos).y), true);
-                    }
-
-                    if (updatedPlayer.remainingHP == 0)
-                    {
-                        // Player 1 tank has been destroyed
-                        playerOneTank.Destroyed();
-
-                        GameOver(1);
-                    }
-                }
-                else
-                {
-                    if (updatedPlayer.playerPos != null)
-                    {
-                        // Move the tank to the updated position
-                        playerTwoTank.MoveToNewCoordinates(new EnvironmentBuilder.MapCoordinates((int)((Vector2)updatedPlayer.playerPos).x, (int)((Vector2)updatedPlayer.playerPos).y), true);
-                    }
-
-                    if (updatedPlayer.remainingHP == 0)
-                    {
-                        // Player 2 tank has been destroyed
-                        playerTwoTank.Destroyed();
-
-                        GameOver(0);
-                    }
-                }
-            }
-        }
-
     }
 
 }

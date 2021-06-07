@@ -32,10 +32,6 @@ public class EnvironmentBuilder : MonoBehaviour
         }
     }
 
-    public Transform leftBounds;
-    public Transform rightBounds;
-    public Transform bottomBounds;
-    
     public Transform groundPieceRoot;
     public GameObject groundPiecePrefab;
 
@@ -59,34 +55,8 @@ public class EnvironmentBuilder : MonoBehaviour
         MapHeight = (int)world.height;
         mapMatrix = world.grid;
 
-        //for (int i = 0; i < world.grid.Count; i++)
-        //{
-        //    mapMatrix.Add((int)world.grid[i]);
-        //}
-
-        //for (int x = 0; x < MapWidth; ++x)
-        //{
-        //    for (int y = 0; y < MapHeight; ++y)
-        //    {
-        //        GetGridValueAt(x, y);
-        //    }
-        //}
-
-        //LSLog.LogImportant($"*** World Grid To String - {world.grid.Count}***", LSLog.LogColor.cyan);
-        //string arrayString = "[";
-        //for (int i = 0; i < world.grid.Count; i++)
-        //{
-        //    arrayString += mapMatrix[i].ToString();
-
-        //    if (i < world.grid.Count - 1)
-        //        arrayString += ",";
-        //}
-
-        //arrayString += "]";
-        //Debug.Log(arrayString);
-
         ClearEnvironment();
-        GenerateFromMap(/*mapMatrix*/);
+        GenerateFromMap();
     }
 
     public void ClearEnvironment()
@@ -208,22 +178,21 @@ public class EnvironmentBuilder : MonoBehaviour
     {
         //Set our old spot to empty
         SetGridValueAt(previousCoordinates.x, previousCoordinates.y, (int)eMapItem.EMPTY);
-        //mapMatrix[previousCoordinates.x][previousCoordinates.y] = (int)eMapItem.EMPTY;
+
         //Set our new spot to have the player
-        //mapMatrix[newCoordinates.x][newCoordinates.y] = playerOne ? (int)eMapItem.PLAYER_1 : (int)eMapItem.PLAYER_2;
         SetGridValueAt(newCoordinates.x, newCoordinates.y, playerOne ? (int)eMapItem.PLAYER_1 : (int)eMapItem.PLAYER_2);
     }
 #endregion
 
     //Create the map given a 1d array
-    private void GenerateFromMap(/*ArraySchema<float> map*/)
+    private void GenerateFromMap()
     {
         tanks = new GameObject[2];
         spawnGameObjects = new GameObject[MapWidth, MapHeight];
         int gridValue;
-        for (int x = 0; x < MapWidth/*map.Count*/; ++x)
+        for (int x = 0; x < MapWidth; ++x)
         {
-            for (int y = 0; y < MapHeight/*map[x].Count*/; ++y)
+            for (int y = 0; y < MapHeight; ++y)
             {
                 gridValue = (int)GetGridValueAt(x, y, out int idx);
                 switch (gridValue)
@@ -258,41 +227,12 @@ public class EnvironmentBuilder : MonoBehaviour
 
         Vector2 temp = groundPieceRoot.localPosition;
 
-        temp.x = /*map.Count*/ ExampleManager.Instance.Room.State.world.width / -2;
+        temp.x = ExampleManager.Instance.Room.State.world.width / -2;
         groundPieceRoot.localPosition = temp;
 
         TankGameManager.Instance.ReportTanks(tanks[0], tanks[1]);
     }
     
-    public void DamageDealt(DamageData damageData)
-    {
-        //LSLog.LogImportant($"Environment - Damage Dealt - Impacted coordinates");
-
-        if (damageData == null || damageData.impactedCoordinates == null)
-        {
-            return;
-        }
-
-        for (int i = 0; i < damageData.impactedCoordinates.Count; i++)
-        {
-            Vector2 coords = damageData.impactedCoordinates[i];
-            //LSLog.LogImportant($"\tCoord = ({coords.x}, {coords.y})");
-            int segment = (int)GetGridValueAt((int)coords.x, (int)coords.y, out int idx);// mapMatrix[(int) coords.x][(int) coords.y];
-
-            switch (segment)
-            {
-                case (int)eMapItem.GROUND:
-                    //Ground goes boom?
-                    SetGridValueAt((int)coords.x, (int)coords.y, (int)eMapItem.EMPTY);
-                    //mapMatrix[(int)coords.x][(int)coords.y] = (int)eMapItem.EMPTY;
-                    spawnGameObjects[(int)coords.x, (int)coords.y]?.SetActive(false);
-                    break;
-            }
-            
-        }
-
-    }
-
     public void UpdateChangedGridCoordinate(string index, float value)
     {
         if (int.TryParse(index, out int idx))

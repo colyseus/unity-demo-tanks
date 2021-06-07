@@ -28,10 +28,8 @@ export class EnvironmentBuilder
         this.state.world.width = width;
         this.state.world.height = height;
 
-        this.state.world.grid = new /*ArraySchema*/MapSchema<number>();
-
-        //this.localGrid = new Array(width * height);
-
+        this.state.world.grid = new MapSchema<number>();
+        
         let randomSeed: number = Math.random() * 50;
         let variation: number = 1.5;
         let noise = fastNoise.Create();
@@ -131,6 +129,41 @@ export class EnvironmentBuilder
         this.SetGridValueAt(coords.x, coords.y, (playerId == 0)
             ? MapIconValues.PLAYER_1
             : MapIconValues.PLAYER_2);
+    }
+
+    getFirePath(barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector2[] {
+        let initialVelocity: Vector3 = barrelForward.clone().multiplyScalar(cannonPower);
+        let currentVelocity: Vector2 = new Vector2(initialVelocity.x, initialVelocity.y);
+        let currPos: Vector2 = new Vector2(barrelPosition.x, barrelPosition.y);// barrelPosition.clone();
+        let pathSteps: Vector2[] = [];
+        pathSteps.push(currPos.clone());
+        const grav: number = -0.98;
+        while (currPos.y > -1.0) {
+            currentVelocity.y += grav;
+            currPos.add(currentVelocity);
+            pathSteps.push(currPos.clone());
+        }
+
+        return this.getHighAccuracyFirePath(pathSteps);
+    }
+
+    getHighAccuracyFirePath(originalPath: Vector2[]) {
+        let newPath: Vector2[] = [];
+        let previousPos: Vector2 = originalPath[0].clone();
+
+        newPath.push(previousPos.clone());
+        for (let i = 1; i < originalPath.length; ++i) {
+            let currPathSeg = originalPath[i].clone();
+            let dist: number = Math.floor(previousPos.distanceTo(currPathSeg)) * 2;
+            let stepSize: Vector2 = new Vector2().subVectors(currPathSeg, previousPos).divideScalar(dist);
+
+            for (let j = 0; j < dist; ++j) {
+                previousPos.add(stepSize);
+                newPath.push(previousPos.clone());
+            }
+        }
+
+        return this.TrimFirePathToEnvironment(newPath);
     }
 
     public TrimFirePathToEnvironment(origPath: Vector2[]): Vector2[] {

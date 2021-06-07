@@ -32,11 +32,13 @@ export class TanksState extends Schema {
     @type("number") turnNumber: number = 0; // incremental from 0 to X
 
     @type("string") statusMessage: string;
+    @type("boolean") inProcessOfQuitingGame : boolean = false; 
 
     isPlayerActing: boolean = false;
     isWaitingForProjectile: boolean = false;
     creatorId: string = "";
     environmentBuilder: EnvironmentBuilder;
+    quitPlayers: Map<number, Player> = new Map<number, Player>();
 
     constructor() {
         super();
@@ -86,6 +88,9 @@ export class TanksState extends Schema {
      * @param {GameState} newState The new state to move to
      */
     moveToState (nextGameState: GameState) {
+
+        logger.silly(`*** Move to State: From ${this.gameState} to ${nextGameState} ***`);
+
         this.previousGameState = this.gameState;
         this.gameState = nextGameState;
     }
@@ -114,43 +119,6 @@ export class TanksState extends Schema {
 
     getCurrentTurnPlayer(): Player {
         return this.players[this.currentTurn];
-    }
-
-    // FIXME: this method could be extracted inside Environment class
-    getFirePath(environment: EnvironmentBuilder, barrelForward: Vector3, barrelPosition: Vector3, cannonPower: number): Vector2[] {
-        let initialVelocity: Vector3 = barrelForward.clone().multiplyScalar(cannonPower);
-        let currentVelocity: Vector2 = new Vector2(initialVelocity.x, initialVelocity.y);
-        let currPos: Vector2 = new Vector2(barrelPosition.x, barrelPosition.y);// barrelPosition.clone();
-        let pathSteps: Vector2[] = [];
-        pathSteps.push(currPos.clone());
-        const grav: number = -0.98;
-        while (currPos.y > -1.0) {
-            currentVelocity.y += grav;
-            currPos.add(currentVelocity);
-            pathSteps.push(currPos.clone());
-        }
-
-        return this.getHighAccuracyFirePath(environment, pathSteps);
-    }
-
-    // FIXME: this method could be extracted inside Environment class
-    getHighAccuracyFirePath(environment: EnvironmentBuilder, originalPath: Vector2[]) {
-        let newPath: Vector2[] = [];
-        let previousPos: Vector2 = originalPath[0].clone();
-
-        newPath.push(previousPos.clone());
-        for (let i = 1; i < originalPath.length; ++i) {
-            let currPathSeg = originalPath[i].clone();
-            let dist: number = Math.floor(previousPos.distanceTo(currPathSeg)) * 2;
-            let stepSize: Vector2 = new Vector2().subVectors(currPathSeg, previousPos).divideScalar(dist);
-
-            for (let j = 0; j < dist; ++j) {
-                previousPos.add(stepSize);
-                newPath.push(previousPos.clone());
-            }
-        }
-
-        return environment.TrimFirePathToEnvironment(newPath);
     }
 
     addNewProjectile(playerId: number, path: Vector2[]): Projectile {

@@ -62,18 +62,11 @@ export class TanksRoom extends Room<TanksState> {
 
     // Callback when a client has joined the room
     onJoin(client: Client, options: any) {
-        console.info(`Client joined! - ${client.sessionId} ***`); console.log(options);
+        logger.info(`Client joined! - ${client.sessionId} ***`); console.log(options);
 
-        //
-        // FIXME: (assign playerId based on first "connected=false" player within state.players)
-        //
-        // If "creator" leaves the room while an opponent is still connected,
-        // when a next player joins, he's going to have the same "playerId" as
-        // the existing player.
-        // 
         const username = options["joiningId"] || options["creatorId"];
 
-        const isCreator = this.state.creatorId === username; // (this.clients.length === 1);
+        const isCreator = this.state.creatorId === username; 
 
         logger.info(`*** On Join - Username = ${username} - Is Creator = ${isCreator} ***`);
 
@@ -107,7 +100,7 @@ export class TanksRoom extends Room<TanksState> {
 
         // Set team0 / team1 key on room's metadata
         this.setMetadata({
-            [`team${player.playerId}`]: client.sessionId
+            [`team${player.playerId}`]: player.name// client.sessionId
         });
     }
 
@@ -145,7 +138,7 @@ export class TanksRoom extends Room<TanksState> {
                 // Check if all the users are ready for a rematch
                 let playersReady = this.checkForRematch();
 
-                // Return out if not all of the players are ready yet.
+                // Return out if not all of the players want a rematch yet.
                 if (playersReady === false) { return; }
 
                 this.state.statusMessage = "";
@@ -183,11 +176,13 @@ export class TanksRoom extends Room<TanksState> {
             client.send(0, { serverTime: this.serverTime });
         });
 
-        // Set player as "ready"
-        this.onMessage("ready", (client) => {
+        this.onMessage("requestRematch", (client) => {
+
             const player = this.state.players[client.userData.playerId];
             if (player) {
-                player.readyState = PlayerReadyState.READY;
+                player.readyState = PlayerReadyState.REMATCH;
+
+                this.state.statusMessage = `${player.name} wants a rematch!`;
             }
         });
 
@@ -244,6 +239,9 @@ export class TanksRoom extends Room<TanksState> {
             }
         });
 
+        /**
+         * Message handler for when a user wants to fire their weapon
+         */
         this.onMessage("fireWeapon", (client, message) => {
 
             // Check if the player can do the action
@@ -279,8 +277,7 @@ export class TanksRoom extends Room<TanksState> {
             }
 
             // Get the firepath using the barrel forward direction, barrel position, and the charged cannon power
-            let projectilePath: Vector_2[] = this.state.getFirePath(
-                this.environmentController,
+            let projectilePath: Vector_2[] = this.state.environmentBuilder.getFirePath(
                 new Vector3(barrelForward.x, barrelForward.y, barrelForward.z),
                 new Vector3(barrelPosition.x, barrelPosition.y, barrelPosition.z),
                 cannonPower
@@ -292,9 +289,17 @@ export class TanksRoom extends Room<TanksState> {
             player.consumeActionPoints(GameRules.FiringActionPointCost);
         });
 
+        /**
+         * Message handler for when a user has elected to quit a game in progress surrendering the game to the other player if one exists
+         */
         this.onMessage("quitGame", (client, message) => {
-            // TODO CLIENT-SIDE:
-            // Call room.leave() directly - onLeave() is going to be triggered with "consented" = true
+            const quittingPlayer = this.state.players[client.userData.playerId];
+            if (!quittingPlayer) {
+                console.error(`*** onLeave - No Player for sessionId - ${client.sessionId} ***`);
+                return;
+            }
+
+            this.onPlayerQuit(quittingPlayer);
         });
     }
 
@@ -302,7 +307,7 @@ export class TanksRoom extends Room<TanksState> {
      * Resets data for a new round of play
      */
     private resetForNewRound() {
-        // Generate environment
+        // Generate new environment
         this.environmentController.GenerateEnvironment(50, 10);
 
         // Reset turn data
@@ -315,25 +320,26 @@ export class TanksRoom extends Room<TanksState> {
      * @returns 
      */
     private canDoAction(playerId: number): boolean {
-        const notMoving = this.state.isPlayerActing === false;
+        const notActing = this.state.isPlayerActing === false;
+        const notWaitingForProjectile = this.state.isWaitingForProjectile === false;
         const goodGameState = (this.state.gameState === GameState.SimulateRound);
 
         return (
             goodGameState && 
-            playerId === this.state.currentTurn && // is current turn?
-            notMoving
+            playerId === this.state.currentTurn &&
+            notActing &&
+            notWaitingForProjectile
         );
     }
 
     /**
-     * Checks if players want a rematch if they have a 'readyState' of "ready"
+     * Checks if players want a rematch if they have a 'readyState' of "watsRematch"
      */
     private checkForRematch() {
         let numPlayersReady: number = 0;
 
         this.state.players.forEach((player) => {
-            if (player.readyState === PlayerReadyState.READY) {
-                this.state.statusMessage = `${player.name} wants a rematch!`;
+            if (player.readyState === PlayerReadyState.REMATCH) {
                 numPlayersReady++;
             }
         });
@@ -352,9 +358,44 @@ export class TanksRoom extends Room<TanksState> {
         // Sync player as not connected.
         leavingPlayer.connected = false;
 
+        if(this.state.inProcessOfQuitingGame  && this.state.quitPlayers.has(leavingPlayer.playerId) == false) {
+            this.onPlayerQuit(leavingPlayer);
+        }
+    }
+
+    private onPlayerQuit(player: Player) {
+
+        logger.info(`*** Player ${player.name} | ${player.playerId} has quit the game ***`);
+
+        // Flag for if the room should disconnect after this player has quit
+        let disconnectRoom: boolean = false;
+
+        // Has the creator quit before a challenger has joined?
+        if(this.metadata.team0 && this.metadata.team1 == null) {
+            logger.info(`*** Creator has quit game before a challenger has arrived ***`);
+            disconnectRoom = true;
+        }
+
+        // No other users are in the room so disconnect
+        if(this.state.inProcessOfQuitingGame && this.state.quitPlayers.size >= 1 ) {
+            logger.info(`*** Left room after someone else already quit! ***`);
+            disconnectRoom = true;
+        }
+
+        // Set team0 / team1 key on room's metadata
         this.setMetadata({
-            [`team${leavingPlayer.playerId}`]: `${leavingPlayer.name} (Surrendered)`
+            [`team${player.playerId}`]: `${player.name} (Surrendered)`
         });
+
+        // Set to true so when the other player joins after this one quits they'll be alerted in game and can then leave
+        this.state.inProcessOfQuitingGame  = true;
+
+        this.state.quitPlayers.set(player.playerId, player);
+
+        // Should the room disconnect?
+        if(disconnectRoom) {
+            this.disconnect();
+        }
     }
 
     onDispose() {

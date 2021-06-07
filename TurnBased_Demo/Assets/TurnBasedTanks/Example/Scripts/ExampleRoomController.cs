@@ -96,23 +96,8 @@ public class ExampleRoomController
     public delegate void OnProjectileUpdated(Projectile projectile, List<DataChange> changes);
     public static event OnProjectileUpdated onProjectileUpdated;
 
-    public delegate void OnReceivedFirePath(int player, int remainingAP, List<Vector3> firePath, DamageData damageData);
-    public static event OnReceivedFirePath onReceivedFirePath;
-
     public delegate void OnSelectedWeaponUpdated(WeaponModel selectedWeapon);
     public static event OnSelectedWeaponUpdated onSelectedWeaponUpdated;
-
-    public delegate void OnPlayerJoined(int playerId, string playerName);
-    public static event OnPlayerJoined onPlayerJoined;
-
-    public delegate void OnPlayerQuit(string playerName);
-    public static event OnPlayerQuit onPlayerQuit;
-
-    public delegate void OnPlayerLeave();
-    public static event OnPlayerLeave onPlayerLeave;
-
-    public delegate void OnTurnCompleted(bool wasSkip);
-    public static OnTurnCompleted onTurnCompleted;
 
     public delegate void OnTankMoved(int player, Tanks.Vector2 newCoords);
     public static OnTankMoved onTankMoved;
@@ -455,37 +440,19 @@ public class ExampleRoomController
         });
 
         //Custom game logic
+        //========================
         _room.State.world.OnChange += changes => onWorldChanged?.Invoke(changes);
 
         _room.State.world.grid.OnChange += (index, value) => onWorldGridChanged?.Invoke(index, value);
 
-        _room.OnMessage<TankTurnUpdateMessage>("turnComplete", (message) =>
-        {
-            onTurnCompleted?.Invoke(message.wasSkip);
-        });
-        //_room.OnMessage<TankMoveMessage>("tankMoved", (message) =>
-        //{
-        //    onTankMoved?.Invoke(message.playerNumber, message.remainingAP, message.newCoords);
-        //});
-        _room.OnMessage<FirePathMessage>("receiveFirePath", (message) => { onReceivedFirePath?.Invoke(message.playerNumber, message.remainingAP, message.firePath, message.damageData ); });
-
-        //_room.OnMessage<SelectedWeaponUpdatedMessage>("selectedWeaponUpdated", (message) => { onSelectedWeaponUpdated?.Invoke(message.weapon);});
-
-        _room.OnMessage<PlayerJoinedMessage>("playerJoined", (message) => { onPlayerJoined?.Invoke(message.playerId, message.playerName); });
-        
-        _room.OnMessage<PlayerQuitMessage>("onPlayerQuitGame", (message) => { onPlayerQuit?.Invoke(message.playerName); });
-
-        _room.OnMessage<ExampleCustomMethodMessage>("onPlayerLeave", (message) => {onPlayerLeave?.Invoke();});
-        //========================
-        
         _room.State.players.OnAdd += OnUserAdd;
         _room.State.players.OnRemove += OnUserRemove;
 
         _room.State.projectiles.OnAdd += OnProjectileAdd;
         _room.State.projectiles.OnRemove += OnProjectileRemove;
+        //========================
 
         _room.State.TriggerAll();
-        //========================
 
         _room.colyseusConnection.OnError += Room_OnError;
         _room.colyseusConnection.OnClose += Room_OnClose;

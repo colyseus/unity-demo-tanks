@@ -385,12 +385,6 @@ using UnityEngine;
             return parseFrom.ToObject<T>();
         }
 
-
-        public void SetAttributes(Dictionary<string, string> attributesToSet)
-        {
-            ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { entityId = state.id, attributesToSet = attributesToSet });
-        }
-
         protected static List<ExamplePropertyCompareResult> Compare<T>(T oldObject, T newObject)
         {
             FieldInfo[] properties = typeof(T).GetFields();
