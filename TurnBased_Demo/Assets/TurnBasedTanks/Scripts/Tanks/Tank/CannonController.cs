@@ -134,21 +134,6 @@ public class CannonController : MonoBehaviour
         }
     }
 
-    public void FireCannon(CannonFirePath firePath, DamageData damageData, Action onComplete = null)
-    {
-        cannonFireEffect.Play();
-        currentFirePath = firePath;
-        FireProjectile(currentFirePath, damageData, onComplete);
-    }
-
-    public void FireProjectile(CannonFirePath path, DamageData damageData, Action onComplete)
-    {
-        GameObject projectile = Instantiate(ProjectilePrefab);
-        projectile.transform.SetParent(TankGameManager.Instance.Builder.groundPieceRoot);
-        projectile.transform.localPosition = path.path[0];
-        projectile.GetComponent<ProjectileBase>().HandPath(path, onComplete, ActiveWeapon, damageData);
-    }
-
     private void AimCannonToAngle()
     {
         currentAimAngle = Mathf.Clamp(currentAimAngle, -90.0f, 90.0f);

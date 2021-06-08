@@ -19,18 +19,6 @@ public class ExampleRoomController
 {
     // Network Events
     //==========================
-    /// <summary>
-    ///     OnNetworkEntityAdd delegate for OnNetworkEntityAdd event.
-    /// </summary>
-    /// <param name="entity">Then entity that was just added to the room.</param>
-    public delegate void OnNetworkEntityAdd(ExampleNetworkedEntity entity);
-
-    /// <summary>
-    ///     OnNetworkEntityRemoved delegate for OnNetworkEntityRemoved event.
-    /// </summary>
-    /// <param name="entity">Then entity that was just removed to the room.</param>
-    public delegate void OnNetworkEntityRemoved(ExampleNetworkedEntity entity, ColyseusNetworkedEntityView view);
-
     //Custom game delegate functions
     //======================================
     public delegate void OnRoomStateChanged(TanksState state, bool isFirstState);
@@ -39,36 +27,9 @@ public class ExampleRoomController
     public delegate void OnUserStateChanged(Player state);
 
     /// <summary>
-    ///     Event for when a NetworkEntity is added to the room.
-    /// </summary>
-    public static OnNetworkEntityAdd onAddNetworkEntity;
-
-    /// <summary>
-    ///     Event for when a NetworkEntity is added to the room.
-    /// </summary>
-    public static OnNetworkEntityRemoved onRemoveNetworkEntity;
-
-    /// <summary>
-    ///     Our user object we get upon joining a room.
-    /// </summary>
-    [SerializeField]
-    private static ExampleNetworkedUser _currentNetworkedUser;
-
-    /// <summary>
     ///     The Client that is created when connecting to the Colyseus server.
     /// </summary>
     private ColyseusClient _client;
-
-    private ColyseusSettings _colyseusSettings;
-
-    /// <summary>
-    ///     Collection of entity creation callbacks. Callbacks are added to
-    ///     the collection when a <see cref="ExampleNetworkedEntity" /> is created.
-    ///     The callbacks are invoked and removed from the collection once the
-    ///     entity has been added to the room.
-    /// </summary>
-    private Dictionary<string, Action<ExampleNetworkedEntity>> _creationCallbacks =
-        new Dictionary<string, Action<ExampleNetworkedEntity>>();
 
     public delegate void OnWorldChanged(List<DataChange> changes);
     public static event OnWorldChanged onWorldChanged;
@@ -92,21 +53,6 @@ public class ExampleRoomController
     public static OnTankMoved onTankMoved;
 
     //==========================
-
-    // TODO: Replace GameDevWare stuff
-    /// <summary>
-    ///     Collection for tracking entities that have been added to the room.
-    /// </summary>
-    private IndexedDictionary<string, ExampleNetworkedEntity> _entities =
-        new IndexedDictionary<string, ExampleNetworkedEntity>();
-
-    /// <summary>
-    ///     Collection for tracking entity views that have been added to the room.
-    /// </summary>
-    private IndexedDictionary<string, ExampleNetworkedEntityView> _entityViews =
-        new IndexedDictionary<string, ExampleNetworkedEntityView>();
-
-    private ExampleNetworkedEntityFactory _factory;
 
     /// <summary>
     ///     Used to help calculate the latency of the connection to the server.
@@ -201,78 +147,9 @@ public class ExampleRoomController
         get { return _lastRoomId; }
     }
 
-    public IndexedDictionary<string, ExampleNetworkedEntity> Entities
-    {
-        get { return _entities; }
-    }
-
-    public IndexedDictionary<string, ExampleNetworkedEntityView> EntityViews
-    {
-        get { return _entityViews; }
-    }
-
-    public Dictionary<string, Action<ExampleNetworkedEntity>> CreationCallbacks
-    {
-        get { return _creationCallbacks; }
-    }
-
-    public ExampleNetworkedUser CurrentNetworkedUser
-    {
-        get { return _currentNetworkedUser; }
-    }
-
-    /// <summary>
-    ///     Checks if a <see cref="ExampleNetworkedEntityView" /> exists for
-    ///     the given ID.
-    /// </summary>
-    /// <param name="entityId">The ID of the <see cref="ExampleNetworkedEntity" /> we're checking for.</param>
-    /// <returns></returns>
-    public bool HasEntityView(string entityId)
-    {
-        return EntityViews.ContainsKey(entityId);
-    }
-
-    /// <summary>
-    ///     Returns a <see cref="ExampleNetworkedEntityView" /> given <see cref="entityId" />
-    /// </summary>
-    /// <param name="entityId"></param>
-    /// <returns>
-    ///     Returns <see cref="ExampleNetworkedEntityView" /> if one exists for the given <see cref="entityId" />
-    /// </returns>
-    public ExampleNetworkedEntityView GetEntityView(string entityId)
-    {
-        if (EntityViews.ContainsKey(entityId))
-        {
-            return EntityViews[entityId];
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    ///     Set the dependencies.
-    /// </summary>
-    /// <param name="roomName"></param>
-    /// <param name="settings"></param>
-    public void SetDependencies(ColyseusSettings settings)
-    {
-        _colyseusSettings = settings;
-
-        ColyseusClient.onAddRoom += AddRoom;
-    }
-
     public void SetRoomOptions(Dictionary<string, object> options)
     {
         roomOptionsDictionary = options;
-    }
-
-    /// <summary>
-    ///     Set the <see cref="NetworkedEntitExampleNetworkedEntityFactoryyFactory" /> of the RoomManager.
-    /// </summary>
-    /// <param name="factory"></param>
-    public void SetNetworkedEntityFactory(ExampleNetworkedEntityFactory factory)
-    {
-        _factory = factory;
     }
 
     /// <summary>
@@ -282,17 +159,6 @@ public class ExampleRoomController
     public void SetClient(ColyseusClient client)
     {
         _client = client;
-    }
-
-    /// <summary>
-    ///     Adds the given room to <see cref="rooms" />
-    /// </summary>
-    /// <param name="roomToAdd"></param>
-    /// <returns></returns>
-    public void AddRoom(IColyseusRoom roomToAdd)
-    {
-        roomToAdd.OnLeave += code => rooms.Remove(roomToAdd);
-        rooms.Add(roomToAdd);
     }
 
     /// <summary>
@@ -373,8 +239,6 @@ public class ExampleRoomController
             await rooms[i].Leave(consented);
         }
 
-        _entities.Clear();
-        _entityViews.Clear();
         _users.Clear();
 
         ClearRoomHandlers();
@@ -388,8 +252,6 @@ public class ExampleRoomController
     /// </summary>
     public virtual void RegisterRoomHandlers()
     {
-        LSLog.LogImportant($"sessionId: {_room.SessionId}");
-
         if (_pingThread != null)
         {
             _pingThread.Abort();
@@ -402,19 +264,6 @@ public class ExampleRoomController
         _room.OnLeave += OnLeaveRoom;
 
         _room.OnStateChange += OnStateChangeHandler;
-
-        _room.OnMessage<ExampleNetworkedUser>("onJoin", currentNetworkedUser =>
-        {
-            _currentNetworkedUser = currentNetworkedUser;
-        });
-
-        _room.OnMessage<ExampleRFCMessage>("onRFC", _rfc =>
-        {
-            if (_entityViews.Keys.Contains(_rfc.entityId))
-            {
-                _entityViews[_rfc.entityId].RemoteFunctionCallHandler(_rfc);
-            }
-        });
 
         _room.OnMessage<ExamplePongMessage>(0, message =>
         {
@@ -496,7 +345,6 @@ public class ExampleRoomController
         _room.OnLeave -= OnLeaveRoom;
 
         _room = null;
-        _currentNetworkedUser = null;
     }
 
     /// <summary>
@@ -543,61 +391,6 @@ public class ExampleRoomController
             LSLog.LogError(ex.Message);
             LSLog.LogError("Failed to join room");
         }
-    }
-
-    /// <summary>
-    ///     The callback for the event when a <see cref="ExampleNetworkedEntity" /> is added to a room.
-    /// </summary>
-    /// <param name="entity">The entity that was just added.</param>
-    /// <param name="key">The entity's key</param>
-    private async void OnEntityAdd(ExampleNetworkedEntity entity, string key)
-    {
-        _entities.Add(entity.id, entity);
-
-        //Creation ID is only Registered with the owner so only owners callback will be triggered
-        if (!string.IsNullOrEmpty(entity.creationId) && _creationCallbacks.ContainsKey(entity.creationId))
-        {
-            _creationCallbacks[entity.creationId].Invoke(entity);
-            _creationCallbacks.Remove(entity.creationId);
-        }
-        else
-        {
-            Debug.Log($"***Not triggering callback for entity creation! ID: {entity.creationId}, Contains key? {_creationCallbacks.ContainsKey(entity.creationId)} ***");
-        }
-
-        onAddNetworkEntity?.Invoke(entity);
-
-        if (_entityViews.ContainsKey(entity.id) == false && !string.IsNullOrEmpty(entity.attributes["prefab"]))
-        {
-            await _factory.CreateFromPrefab(entity);
-        }
-        else
-        {
-            Debug.Log($"***Not Creating prefab for entity for entity creation! ID: {entity.id}, Contains key? {_entityViews.ContainsKey(entity.id)} ***");
-        }
-    }
-
-    /// <summary>
-    ///     The callback for the event when a <see cref="ExampleNetworkedEntity" /> is removed from a room.
-    /// </summary>
-    /// <param name="entity">The entity that was just removed.</param>
-    /// <param name="key">The entity's key</param>
-    private void OnEntityRemoved(ExampleNetworkedEntity entity, string key)
-    {
-        if (_entities.ContainsKey(entity.id))
-        {
-            _entities.Remove(entity.id);
-        }
-
-        ColyseusNetworkedEntityView view = null;
-
-        if (_entityViews.ContainsKey(entity.id))
-        {
-            view = _entityViews[entity.id];
-            _entityViews.Remove(entity.id);
-        }
-
-        onRemoveNetworkEntity?.Invoke(entity, view);
     }
 
     /// <summary>
