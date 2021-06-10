@@ -15,7 +15,7 @@ using Vector2 = UnityEngine.Vector2;
 ///     Manages the rooms of a server connection.
 /// </summary>
 [Serializable]
-public class ExampleRoomController
+public class TanksRoomController
 {
     // Network Events
     //==========================
@@ -55,38 +55,9 @@ public class ExampleRoomController
     //==========================
 
     /// <summary>
-    ///     Used to help calculate the latency of the connection to the server.
-    /// </summary>
-    private double _lastPing;
-
-    /// <summary>
-    ///     Used to help calculate the latency of the connection to the server.
-    /// </summary>
-    private double _lastPong;
-
-    /// <summary>
-    ///     The ID of the room we were just connected to.
-    ///     If there is an abnormal disconnect from the current room
-    ///     an automatic attempt will be made to reconnect to that room
-    ///     with this room ID.
-    /// </summary>
-    private string _lastRoomId;
-
-    /// <summary>
-    ///     Thread responsible for running <see cref="RunPingThread" />
-    ///     on a <see cref="ColyseusRoom{T}" />
-    /// </summary>
-    private Thread _pingThread;
-
-    /// <summary>
     ///     The current or active Room we get when joining or creating a room.
     /// </summary>
-    private ColyseusRoom<Tanks.TanksState> _room;
-
-    /// <summary>
-    ///     The time as received from the server in milliseconds.
-    /// </summary>
-    private double _serverTime = -1;
+    private ColyseusRoom<TanksState> _room;
 
     /// <summary>
     ///     Collection for tracking users that have joined the room.
@@ -95,11 +66,6 @@ public class ExampleRoomController
         new IndexedDictionary<int, Player>();
 
     private Dictionary<string, Projectile> _projectiles = new Dictionary<string, Projectile>();
-
-    /// <summary>
-    ///     Used to help calculate the latency of the connection to the server.
-    /// </summary>
-    private bool _waitForPong;
 
     /// <summary>
     ///     The name of the room clients will attempt to create or join on the Colyseus server.
@@ -113,38 +79,9 @@ public class ExampleRoomController
     /// </summary>
     public List<IColyseusRoom> rooms = new List<IColyseusRoom>();
 
-    /// <summary>
-    ///     Returns the synchronized time from the server in milliseconds.
-    /// </summary>
-    public double GetServerTime
-    {
-        get { return _serverTime; }
-    }
-
-    /// <summary>
-    ///     Returns the synchronized time from the server in seconds.
-    /// </summary>
-    public double GetServerTimeSeconds
-    {
-        get { return _serverTime / 1000; }
-    }
-
-    /// <summary>
-    ///     The latency in milliseconds between client and server.
-    /// </summary>
-    public double GetRoundtripTime
-    {
-        get { return _lastPong - _lastPing; }
-    }
-
-    public ColyseusRoom<Tanks.TanksState> Room
+    public ColyseusRoom<TanksState> Room
     {
         get { return _room; }
-    }
-
-    public string LastRoomID
-    {
-        get { return _lastRoomId; }
     }
 
     public void SetRoomOptions(Dictionary<string, object> options)
@@ -172,7 +109,7 @@ public class ExampleRoomController
         try
         {
             //Populate an options dictionary with custom options provided elsewhere as well as the critical option we need here, roomId
-            Dictionary<string, object> options = new Dictionary<string, object> {["roomId"] = roomId, ["creatorId"] = ExampleManager.Instance.UserName};
+            Dictionary<string, object> options = new Dictionary<string, object> {["roomId"] = roomId, ["creatorId"] = TanksColyseusManager.Instance.UserName};
             foreach (KeyValuePair<string, object> option in roomOptionsDictionary)
             {
                 options.Add(option.Key, option.Value);
@@ -187,7 +124,6 @@ public class ExampleRoomController
         }
 
         LSLog.LogImportant($"Created Room: {_room.Id}");
-        _lastRoomId = roomId;
         RegisterRoomHandlers();
     }
 
@@ -223,7 +159,6 @@ public class ExampleRoomController
 
         LSLog.LogImportant($"Joined / Created Room: {_room.Id}");
 
-        _lastRoomId = _room.Id;
         RegisterRoomHandlers();
     }
 
@@ -252,25 +187,9 @@ public class ExampleRoomController
     /// </summary>
     public virtual void RegisterRoomHandlers()
     {
-        if (_pingThread != null)
-        {
-            _pingThread.Abort();
-            _pingThread = null;
-        }
-
-        _pingThread = new Thread(RunPingThread);
-        _pingThread.Start(_room);
-
         _room.OnLeave += OnLeaveRoom;
 
         _room.OnStateChange += OnStateChangeHandler;
-
-        _room.OnMessage<ExamplePongMessage>(0, message =>
-        {
-            _lastPong = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            _serverTime = message.serverTime;
-            _waitForPong = false;
-        });
 
         //Custom game logic
         //========================
@@ -304,14 +223,8 @@ public class ExampleRoomController
     private void OnLeaveRoom(WebSocketCloseCode code)
     {
         LSLog.Log("ROOM: ON LEAVE =- Reason: " + code);
-        _pingThread.Abort();
-        _pingThread = null;
+        
         _room = null;
-
-        if (code != WebSocketCloseCode.Normal && !string.IsNullOrEmpty(_lastRoomId))
-        {
-            JoinRoomId(_lastRoomId, false);
-        }
     }
 
     /// <summary>
@@ -319,12 +232,6 @@ public class ExampleRoomController
     /// </summary>
     private void ClearRoomHandlers()
     {
-        if (_pingThread != null)
-        {
-            _pingThread.Abort();
-            _pingThread = null;
-        }
-
         if (_room == null)
         {
             return;
@@ -372,7 +279,7 @@ public class ExampleRoomController
             {
                 Dictionary<string, object> options = new Dictionary<string, object>();
 
-                options.Add("joiningId", ExampleManager.Instance.UserName);
+                options.Add("joiningId", TanksColyseusManager.Instance.UserName);
 
                 _room = await _client.JoinById<Tanks.TanksState>(roomId, options);
 
@@ -383,7 +290,7 @@ public class ExampleRoomController
                 }
             }
             LSLog.LogImportant($"Connected to {roomId}..");
-            _lastRoomId = roomId;
+            
             RegisterRoomHandlers();
         }
         catch (Exception ex)
@@ -485,56 +392,8 @@ public class ExampleRoomController
         onRoomStateChanged?.Invoke(state, isFirstState);
     }
 
-    /// <summary>
-    ///     Sends "ping" message to current room to help measure latency to the server.
-    /// </summary>
-    /// <param name="roomToPing">The <see cref="ColyseusRoom{T}" /> to ping.</param>
-    private void RunPingThread(object roomToPing)
-    {
-        ColyseusRoom<TanksState> currentRoom = (ColyseusRoom<TanksState>) roomToPing;
-
-        const float pingInterval = 0.5f; // seconds
-        const float pingTimeout = 15f; //seconds
-
-        int timeoutMilliseconds = Mathf.FloorToInt(pingTimeout * 1000);
-        int intervalMilliseconds = Mathf.FloorToInt(pingInterval * 1000);
-
-        DateTime pingStart;
-        while (currentRoom != null)
-        {
-            _waitForPong = true;
-            pingStart = DateTime.Now;
-            _lastPing = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            _ = currentRoom.Send("ping");
-
-            while (currentRoom != null && _waitForPong &&
-                   DateTime.Now.Subtract(pingStart).TotalSeconds < timeoutMilliseconds)
-            {
-                Thread.Sleep(200);
-            }
-
-            if (_waitForPong)
-            {
-                LSLog.LogError("Ping Timed out");
-            }
-
-            Thread.Sleep(intervalMilliseconds);
-        }
-    }
-
-    /// <summary>
-    ///     Increments the known <see cref="_serverTime" /> by <see cref="Time.fixedDeltaTime" />
-    ///     converted into milliseconds.
-    /// </summary>
-    public void IncrementServerTime()
-    {
-        _serverTime += Time.fixedDeltaTime * 1000;
-    }
-
     public async void CleanUp()
     {
-        _pingThread?.Abort();
-
         List<Task> leaveRoomTasks = new List<Task>();
 
         foreach (IColyseusRoom roomEl in rooms)

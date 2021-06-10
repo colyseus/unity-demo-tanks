@@ -1,7 +1,7 @@
 ﻿[System.Serializable]
 public class FireWeaponMessage
 {
-    public ExampleVector3Obj barrelForward;
-    public ExampleVector3Obj barrelPosition;
+    public Vector3Obj barrelForward;
+    public Vector3Obj barrelPosition;
     public float cannonPower;
 }

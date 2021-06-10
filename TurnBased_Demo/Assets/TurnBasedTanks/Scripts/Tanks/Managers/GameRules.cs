@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class GameRules
 {
-    public static int MovementAPCost => ExampleManager.Instance.Room.State.gameRules.MovementActionPointCost;
-    public static int FiringAPCost => ExampleManager.Instance.Room.State.gameRules.FiringActionPointCost;
-    public static int MaxAP => ExampleManager.Instance.Room.State.gameRules.MaxActionPoints;
+    public static int MovementAPCost => TanksColyseusManager.Instance.Room.State.gameRules.MovementActionPointCost;
+    public static int FiringAPCost => TanksColyseusManager.Instance.Room.State.gameRules.FiringActionPointCost;
+    public static int MaxAP => TanksColyseusManager.Instance.Room.State.gameRules.MaxActionPoints;
 }

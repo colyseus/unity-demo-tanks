@@ -35,7 +35,7 @@ public class LobbyController : MonoBehaviour
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
 
-        while (!ExampleManager.IsReady)
+        while (!TanksColyseusManager.IsReady)
         {
             yield return new WaitForEndOfFrame();
         }
@@ -46,14 +46,14 @@ public class LobbyController : MonoBehaviour
             ["minReqPlayers"] = minRequiredPlayers.ToString()
         };
 
-        ExampleManager.Instance.Initialize(roomName, roomOptions);
-        ExampleManager.onRoomsReceived += OnRoomsReceived;
+        TanksColyseusManager.Instance.Initialize(roomName, roomOptions);
+        TanksColyseusManager.onRoomsReceived += OnRoomsReceived;
         connectingCover.SetActive(false);
     }
 
     private void OnDestroy()
     {
-        ExampleManager.onRoomsReceived -= OnRoomsReceived;
+        TanksColyseusManager.onRoomsReceived -= OnRoomsReceived;
     }
 
     public void CreateUser()
@@ -61,16 +61,16 @@ public class LobbyController : MonoBehaviour
         string desiredUserName = createUserMenu.UserName;
         PlayerPrefs.SetString("UserName", desiredUserName);
 
-        ColyseusSettings clonedSettings = ExampleManager.Instance.CloneSettings();
+        ColyseusSettings clonedSettings = TanksColyseusManager.Instance.CloneSettings();
         clonedSettings.colyseusServerAddress = createUserMenu.ServerURL;
         clonedSettings.colyseusServerPort = createUserMenu.ServerPort;
         clonedSettings.useSecureProtocol = createUserMenu.UseSecure;
 
-        ExampleManager.Instance.OverrideSettings(clonedSettings);
+        TanksColyseusManager.Instance.OverrideSettings(clonedSettings);
 
-        ExampleManager.Instance.InitializeClient();
+        TanksColyseusManager.Instance.InitializeClient();
 
-        ExampleManager.Instance.UserName = desiredUserName;
+        TanksColyseusManager.Instance.UserName = desiredUserName;
         //Do user creation stuff
         createUserMenu.gameObject.SetActive(false);
         selectRoomMenu.gameObject.SetActive(true);
@@ -81,19 +81,19 @@ public class LobbyController : MonoBehaviour
     {
         connectingCover.SetActive(true);
         string desiredRoomName = selectRoomMenu.RoomCreationName;
-        LoadGallery(() => { ExampleManager.Instance.CreateNewRoom(desiredRoomName); });
+        LoadGallery(() => { TanksColyseusManager.Instance.CreateNewRoom(desiredRoomName); });
     }
 
     public void JoinRoom(string id)
     {
         connectingCover.SetActive(true);
-        LoadGallery(() => { ExampleManager.Instance.JoinExistingRoom(id, true); });
+        LoadGallery(() => { TanksColyseusManager.Instance.JoinExistingRoom(id, true); });
     }
 
     public void ReJoinRoom(string id)
     {
         connectingCover.SetActive(true);
-        LoadGallery(() => { ExampleManager.Instance.JoinExistingRoom(id, false); });
+        LoadGallery(() => { TanksColyseusManager.Instance.JoinExistingRoom(id, false); });
     }
 
     public void OnConnectedToServer()
@@ -113,8 +113,8 @@ public class LobbyController : MonoBehaviour
         {
             //Check a rooms metadata. If its one of our rooms OR waiting for a player, we show it
             TanksRoomMetadata metadata = originalRooms[i].metadata;
-            if (metadata.team1 == null || (metadata.team1.Equals(ExampleManager.Instance.UserName) ||
-                                           metadata.team0.Equals(ExampleManager.Instance.UserName)))
+            if (metadata.team1 == null || (metadata.team1.Equals(TanksColyseusManager.Instance.UserName) ||
+                                           metadata.team0.Equals(TanksColyseusManager.Instance.UserName)))
             {
                 trimmedRooms.Add(originalRooms[i]);
             }

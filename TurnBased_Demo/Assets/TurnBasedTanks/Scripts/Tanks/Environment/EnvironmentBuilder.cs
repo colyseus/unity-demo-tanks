@@ -227,7 +227,7 @@ public class EnvironmentBuilder : MonoBehaviour
 
         Vector2 temp = groundPieceRoot.localPosition;
 
-        temp.x = ExampleManager.Instance.Room.State.world.width / -2;
+        temp.x = TanksColyseusManager.Instance.Room.State.world.width / -2;
         groundPieceRoot.localPosition = temp;
 
         TankGameManager.Instance.ReportTanks(tanks[0], tanks[1]);

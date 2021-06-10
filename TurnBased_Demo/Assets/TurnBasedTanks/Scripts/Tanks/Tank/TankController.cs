@@ -145,7 +145,7 @@ public class TankController : MonoBehaviour
     {
         if (!canAct)
             return;
-        ExampleManager.NetSend("changeWeapon", desIndex);
+        TanksColyseusManager.NetSend("changeWeapon", desIndex);
     }
 
     public void UpdateSelectedWeapon(Weapon weapon)

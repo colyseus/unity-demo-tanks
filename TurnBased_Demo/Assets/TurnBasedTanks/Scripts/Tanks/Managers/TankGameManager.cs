@@ -72,26 +72,26 @@ public class TankGameManager : MonoBehaviour
     void OnEnable()
     {
         // Subscribe to events
-        ExampleRoomController.onRoomStateChanged += OnRoomStateChanged;
-        ExampleRoomController.onTankMoved += OnPlayerMove;
-        ExampleRoomController.onWorldChanged += OnWorldChanged;
-        ExampleRoomController.onPlayerChange += OnPlayerUpdated;
-        ExampleRoomController.onProjectileAdded += OnProjectileAdded;
-        ExampleRoomController.onProjectileRemoved += OnProjectileRemoved;
-        ExampleRoomController.onProjectileUpdated += OnProjectileUpdated;
+        TanksRoomController.onRoomStateChanged += OnRoomStateChanged;
+        TanksRoomController.onTankMoved += OnPlayerMove;
+        TanksRoomController.onWorldChanged += OnWorldChanged;
+        TanksRoomController.onPlayerChange += OnPlayerUpdated;
+        TanksRoomController.onProjectileAdded += OnProjectileAdded;
+        TanksRoomController.onProjectileRemoved += OnProjectileRemoved;
+        TanksRoomController.onProjectileUpdated += OnProjectileUpdated;
     }
 
     void OnDisable()
     {
         // Unsubscribe from events
-        ExampleRoomController.onRoomStateChanged -= OnRoomStateChanged;
-        ExampleRoomController.onTankMoved -= OnPlayerMove;
-        ExampleRoomController.onWorldChanged -= OnWorldChanged;
-        ExampleRoomController.onPlayerChange -= OnPlayerUpdated;
-        ExampleRoomController.onProjectileAdded -= OnProjectileAdded;
-        ExampleRoomController.onProjectileRemoved -= OnProjectileRemoved;
-        ExampleRoomController.onProjectileUpdated -= OnProjectileUpdated;
-        ExampleRoomController.onWorldGridChanged -= OnWorldGridChanged;
+        TanksRoomController.onRoomStateChanged -= OnRoomStateChanged;
+        TanksRoomController.onTankMoved -= OnPlayerMove;
+        TanksRoomController.onWorldChanged -= OnWorldChanged;
+        TanksRoomController.onPlayerChange -= OnPlayerUpdated;
+        TanksRoomController.onProjectileAdded -= OnProjectileAdded;
+        TanksRoomController.onProjectileRemoved -= OnProjectileRemoved;
+        TanksRoomController.onProjectileUpdated -= OnProjectileUpdated;
+        TanksRoomController.onWorldGridChanged -= OnWorldGridChanged;
     }
 
     private void OnWorldGridChanged(string index, float value)
@@ -165,7 +165,7 @@ public class TankGameManager : MonoBehaviour
     private void UpdatePlayer(int playerId, DataChange change)
     {
         TankController tank = playerId == 0 ? playerOneTank : playerTwoTank;
-        TanksState state = ExampleManager.Instance.Room.State;
+        TanksState state = TanksColyseusManager.Instance.Room.State;
 
         switch (change.Field)
         {
@@ -270,7 +270,7 @@ public class TankGameManager : MonoBehaviour
             if (string.Equals(changes[i].Field, "grid"))
             {
                 // We got a new world
-                ReceiveWorldMap(ExampleManager.Instance.Room.State.world);
+                ReceiveWorldMap(TanksColyseusManager.Instance.Room.State.world);
 
                 // If we're currently in a Game Over State it means we're starting a new round of play
                 if (IsGameOver)
@@ -311,7 +311,7 @@ public class TankGameManager : MonoBehaviour
         // Determine our player Id
         state.players.ForEach((player) =>
         {
-            if (string.Equals(player.sessionId, ExampleManager.Instance.Room.SessionId))
+            if (string.Equals(player.sessionId, TanksColyseusManager.Instance.Room.SessionId))
             {
                 OurPlayerID = (int) player.playerId;
             }
@@ -335,7 +335,7 @@ public class TankGameManager : MonoBehaviour
 
         StartTurn();
 
-        ExampleRoomController.onWorldGridChanged += OnWorldGridChanged;
+        TanksRoomController.onWorldGridChanged += OnWorldGridChanged;
     }
 
     /// <summary>
@@ -402,7 +402,7 @@ public class TankGameManager : MonoBehaviour
 
         Vector3 newWorldPos = environmentBuilder.CoordinateToWorldPosition(tank.mapCoords);
         FocusOnPosition(newWorldPos, overrideZoom: false, onArrival: null);
-        UpdateUI(ExampleManager.Instance.Room.State);
+        UpdateUI(TanksColyseusManager.Instance.Room.State);
     }
 
     /// <summary>
@@ -410,7 +410,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void RequestRematch()
     {
-        ExampleManager.NetSend("requestRematch");
+        TanksColyseusManager.NetSend("requestRematch");
     }
 
     /// <summary>
@@ -418,7 +418,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void QuitMatch()
     {
-        ExampleManager.NetSend("quitGame");
+        TanksColyseusManager.NetSend("quitGame");
 
         ReturnToLobby();
     }
@@ -428,7 +428,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void ReturnToLobby()
     {
-        ExampleManager.Instance.LeaveAllRooms(() => { SceneManager.LoadScene(0); });
+        TanksColyseusManager.Instance.LeaveAllRooms(() => { SceneManager.LoadScene(0); });
     }
 
     /// <summary>
@@ -442,7 +442,7 @@ public class TankGameManager : MonoBehaviour
         IsGameOver = true;
 
         // Unsubscribe from grid changes until the next game gets initialized
-        ExampleRoomController.onWorldGridChanged -= OnWorldGridChanged;
+        TanksRoomController.onWorldGridChanged -= OnWorldGridChanged;
     }
 
     /// <summary>
@@ -527,7 +527,7 @@ public class TankGameManager : MonoBehaviour
             }
         }
 
-        if (GetCurrentTurnAP(ExampleManager.Instance.Room.State) >= GameRules.FiringAPCost && Input.GetMouseButtonDown(0))
+        if (GetCurrentTurnAP(TanksColyseusManager.Instance.Room.State) >= GameRules.FiringAPCost && Input.GetMouseButtonDown(0))
         {
             _fireChargeInProgress = true;
             GetTankForCurrentTurn().StartChargeCannon();
@@ -553,7 +553,7 @@ public class TankGameManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space))
         {
             //Skip remainder of turn
-            ExampleManager.NetSend("skipTurn");
+            TanksColyseusManager.NetSend("skipTurn");
         }
     }
 
@@ -564,10 +564,10 @@ public class TankGameManager : MonoBehaviour
     {
         TankController tank = GetTankForCurrentTurn();
 
-        ExampleVector3Obj barrelForward = new ExampleVector3Obj(tank.BarrelForward);
-        ExampleVector3Obj barrelPosition = new ExampleVector3Obj(environmentBuilder.groundPieceRoot.InverseTransformPoint(tank.BarrelPosition));
+        Vector3Obj barrelForward = new Vector3Obj(tank.BarrelForward);
+        Vector3Obj barrelPosition = new Vector3Obj(environmentBuilder.groundPieceRoot.InverseTransformPoint(tank.BarrelPosition));
 
-        ExampleManager.NetSend("fireWeapon", new FireWeaponMessage() { barrelForward = barrelForward, barrelPosition = barrelPosition, cannonPower = tank.CannonPower });
+        TanksColyseusManager.NetSend("fireWeapon", new FireWeaponMessage() { barrelForward = barrelForward, barrelPosition = barrelPosition, cannonPower = tank.CannonPower });
         
     }
 
@@ -577,7 +577,7 @@ public class TankGameManager : MonoBehaviour
     /// <param name="aimAngle"></param>
     private void SendAimAngle(float aimAngle)
     {
-        ExampleManager.NetSend("setAimAngle", aimAngle);
+        TanksColyseusManager.NetSend("setAimAngle", aimAngle);
     }
 
     /// <summary>
@@ -680,7 +680,7 @@ public class TankGameManager : MonoBehaviour
     /// <param name="direction"></param>
     public void AttemptMove(int direction)
     {
-        ExampleManager.NetSend("movePlayer", direction);
+        TanksColyseusManager.NetSend("movePlayer", direction);
     }
 
     private IEnumerator Co_WaitAndRefocusPlayer()

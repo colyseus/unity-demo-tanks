@@ -31,7 +31,7 @@ public class CreateUserMenu : MonoBehaviour
                 return serverURLInput.text;
             }
 
-            return ExampleManager.Instance.ColyseusServerAddress;
+            return TanksColyseusManager.Instance.ColyseusServerAddress;
         }
     }
 
@@ -44,7 +44,7 @@ public class CreateUserMenu : MonoBehaviour
                 return serverPortInput.text;
             }
 
-            return ExampleManager.Instance.ColyseusServerPort;
+            return TanksColyseusManager.Instance.ColyseusServerPort;
         }
     }
 
@@ -70,9 +70,9 @@ public class CreateUserMenu : MonoBehaviour
 
     private void Start()
     {
-        serverURLInput.text = ExampleManager.Instance.ColyseusServerAddress;
-        serverPortInput.text = ExampleManager.Instance.ColyseusServerPort;
-        secureToggle.isOn = ExampleManager.Instance.ColyseusUseSecure;
+        serverURLInput.text = TanksColyseusManager.Instance.ColyseusServerAddress;
+        serverPortInput.text = TanksColyseusManager.Instance.ColyseusServerPort;
+        secureToggle.isOn = TanksColyseusManager.Instance.ColyseusUseSecure;
     }
 
     public void OnInputFieldChange()

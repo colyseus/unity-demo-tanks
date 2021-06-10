@@ -5,7 +5,7 @@ using LucidSightTools;
 using Tanks;
 using UnityEngine;
 
-public class ExampleManager : ColyseusManager<ExampleManager>
+public class TanksColyseusManager : ColyseusManager<TanksColyseusManager>
 {
     public delegate void OnRoomsReceived(TanksRoomsAvailable[] rooms);
 
@@ -20,7 +20,7 @@ public class ExampleManager : ColyseusManager<ExampleManager>
     }
 
     [SerializeField]
-    private ExampleRoomController _roomController;
+    private TanksRoomController _roomController;
 
     private bool isInitialized;
 
@@ -65,7 +65,7 @@ public class ExampleManager : ColyseusManager<ExampleManager>
 
         isInitialized = true;
         // Set up room controller
-        _roomController = new ExampleRoomController {roomName = roomName};
+        _roomController = new TanksRoomController {roomName = roomName};
         _roomController.SetRoomOptions(roomOptions);
     }
 
@@ -77,16 +77,6 @@ public class ExampleManager : ColyseusManager<ExampleManager>
         base.InitializeClient();
 
         _roomController.SetClient(client);
-    }
-
-    /// <summary>
-    ///     Frame-rate independent message for physics calculations.
-    /// </summary>
-    protected override void FixedUpdate()
-    {
-        base.FixedUpdate();
-
-        _roomController.IncrementServerTime();
     }
 
     public async void GetAvailableRooms()

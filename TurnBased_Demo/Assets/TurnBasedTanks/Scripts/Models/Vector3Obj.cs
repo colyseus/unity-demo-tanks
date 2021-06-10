@@ -3,16 +3,16 @@ using UnityEngine;
 
 //Wrapper class for serializable Vector3 response we will receive from the server
 [Serializable]
-public class ExampleVector3Obj
+public class Vector3Obj
 {
-    public ExampleVector3Obj()
+    public Vector3Obj()
     {
         x = 0;
         y = 0;
         z = 0;
     }
 
-    public ExampleVector3Obj(Vector3 vector3)
+    public Vector3Obj(Vector3 vector3)
     {
         x = vector3.x;
         y = vector3.y;
