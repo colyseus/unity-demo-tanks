@@ -13,11 +13,8 @@ public class LobbyController : MonoBehaviour
     [SerializeField]
     private CreateUserMenu createUserMenu = null;
 
-    public int minRequiredPlayers = 2;
-
     //Variables to initialize the room controller
     public string roomName = "YOURROOM";
-    public string logicFileName = "YOURLOGIC";
     public string nextSceneName = "GAMESCENE";
 
     [SerializeField]
@@ -40,11 +37,7 @@ public class LobbyController : MonoBehaviour
             yield return new WaitForEndOfFrame();
         }
 
-        Dictionary<string, object> roomOptions = new Dictionary<string, object>
-        {
-            ["logic"] = logicFileName, //The name of our custom logic file
-            ["minReqPlayers"] = minRequiredPlayers.ToString()
-        };
+        Dictionary<string, object> roomOptions = new Dictionary<string, object>();
 
         TanksColyseusManager.Instance.Initialize(roomName, roomOptions);
         TanksColyseusManager.onRoomsReceived += OnRoomsReceived;
@@ -56,6 +49,9 @@ public class LobbyController : MonoBehaviour
         TanksColyseusManager.onRoomsReceived -= OnRoomsReceived;
     }
 
+    /// <summary>
+    /// Used with button input from the user to continue with the desired username
+    /// </summary>
     public void CreateUser()
     {
         string desiredUserName = createUserMenu.UserName;
@@ -81,19 +77,19 @@ public class LobbyController : MonoBehaviour
     {
         connectingCover.SetActive(true);
         string desiredRoomName = selectRoomMenu.RoomCreationName;
-        LoadGallery(() => { TanksColyseusManager.Instance.CreateNewRoom(desiredRoomName); });
+        LoadNextScene(() => { TanksColyseusManager.Instance.CreateNewRoom(desiredRoomName); });
     }
 
     public void JoinRoom(string id)
     {
         connectingCover.SetActive(true);
-        LoadGallery(() => { TanksColyseusManager.Instance.JoinExistingRoom(id, true); });
+        LoadNextScene(() => { TanksColyseusManager.Instance.JoinExistingRoom(id, true); });
     }
 
     public void ReJoinRoom(string id)
     {
         connectingCover.SetActive(true);
-        LoadGallery(() => { TanksColyseusManager.Instance.JoinExistingRoom(id, false); });
+        LoadNextScene(() => { TanksColyseusManager.Instance.JoinExistingRoom(id, false); });
     }
 
     public void OnConnectedToServer()
@@ -123,7 +119,7 @@ public class LobbyController : MonoBehaviour
         return trimmedRooms.ToArray();
     }
 
-    private void LoadGallery(Action onComplete)
+    private void LoadNextScene(Action onComplete)
     {
         StartCoroutine(LoadSceneAsync(nextSceneName, onComplete));
     }

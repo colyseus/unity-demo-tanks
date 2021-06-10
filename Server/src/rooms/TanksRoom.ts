@@ -5,13 +5,9 @@ import { EnvironmentBuilder } from "./tanks/EnvironmentController";
 import { GameRules } from "./tanks/rules";
 import { Vector3, Vector2 as Vector_2 } from "three";
 import logger from "../helpers/logger";
-import { Vector2 } from "./schema/Vector2";
-import { Projectile } from "./schema/Projectile";
 
 export class TanksRoom extends Room<TanksState> {
     
-    serverTime: number = 0;
-
     environmentController: EnvironmentBuilder; // Generates and maintains the game's terrain
     currPlayerActionWait: number = 0; // Counter to help with the wait before allowing another action
     
@@ -106,7 +102,6 @@ export class TanksRoom extends Room<TanksState> {
      * @param deltaTime Delta time of the server
      */
     gameLoop(deltaTime: number) {
-        this.serverTime += deltaTime;
 
         const deltaTimeSeconds = deltaTime / 1000;
 
@@ -175,11 +170,6 @@ export class TanksRoom extends Room<TanksState> {
      * Registers handlers for messages expected to come from the client
      */
     private registerMessageHandlers() {
-
-        // Set the callback for the "ping" message for tracking server-client latency
-        this.onMessage("ping", (client) => {
-            client.send(0, { serverTime: this.serverTime });
-        });
 
         /**
          * Message handler for when a player wants a rematch
