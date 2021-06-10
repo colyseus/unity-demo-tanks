@@ -11,7 +11,8 @@ export class TanksRoom extends Room<TanksState> {
     environmentController: EnvironmentBuilder; // Generates and maintains the game's terrain
     currPlayerActionWait: number = 0; // Counter to help with the wait before allowing another action
     
-    patchRate = 50; // The ms delay between room state patch updates
+    pauseDelay: number = 2082240000; // The ms delay for patch and simulation interval when the server is paused
+    serverPaused: boolean = false; // Flag to help us determine if the server is paused and needs to be unpaused
 
     /**
      * Callback for when the room is created
@@ -22,9 +23,9 @@ export class TanksRoom extends Room<TanksState> {
         console.log(options);
         console.info("***********************");
 
-        this.maxClients = 2;
-        this.autoDispose = false;
-        this.roomId = options["roomId"];
+        this.maxClients = 2; // Only two players per game
+        this.autoDispose = false; // Set autoDispose to false to keep the room alive even if both players are not connected to the room
+        this.roomId = options["roomId"]; // Set the room Id to what the creator specified
 
         // Initialize initial room state
         this.setState(new TanksState().assign({
@@ -40,6 +41,7 @@ export class TanksRoom extends Room<TanksState> {
             name: options["creatorId"],
             playerId: 0
         }));
+
         this.state.players.push(new Player().assign({
             playerId: 1
         }));
@@ -52,8 +54,7 @@ export class TanksRoom extends Room<TanksState> {
 
         this.registerMessageHandlers();
 
-        // Set the Simulation Interval callback
-        this.setSimulationInterval(dt => this.gameLoop(dt));
+        this.setServerPause(false);
     }
 
     // Callback when a client has joined the room
@@ -95,6 +96,12 @@ export class TanksRoom extends Room<TanksState> {
         this.setMetadata({
             [`team${player.playerId}`]: player.name
         });
+
+        // Check if the server needs to be unpaused
+        if(this.serverPaused) {
+            // The server is currently paused so unpause it since a player has connected
+            this.setServerPause(false);
+        }
     }
 
     /**
@@ -360,6 +367,23 @@ export class TanksRoom extends Room<TanksState> {
         return (numPlayersReady === 2);
     }
 
+    /**
+     * Pauses the simulation interval.
+     * @param pause Should the server pause the simulation interval?
+     */
+    private setServerPause(pause: boolean) {
+
+        if(pause) {
+            this.setSimulationInterval(dt => this.gameLoop(dt), this.pauseDelay);
+        }
+        else {
+            // Set the Simulation Interval callback
+            this.setSimulationInterval(dt => this.gameLoop(dt));
+        }
+
+        this.serverPaused = pause;
+    }
+
     // Callback when a client has left the room
     async onLeave(client: Client, consented: boolean) {
         const leavingPlayer = this.state.players[client.userData.playerId];
@@ -370,6 +394,20 @@ export class TanksRoom extends Room<TanksState> {
 
         // Sync player as not connected.
         leavingPlayer.connected = false;
+
+        // Check if the server should pause the simulation loop because
+        // there are no users connected to the room
+        let anyConnected: boolean = false;
+        this.state.players.forEach((player, index) => {
+            if(player.connected) {
+                anyConnected = true;
+            }
+        });
+
+        if(anyConnected == false) {
+            // There are no users connected so pause the server updates
+            this.setServerPause(true);
+        }
 
         if(this.state.inProcessOfQuitingGame  && this.state.quitPlayers.has(leavingPlayer.playerId) == false) {
             this.onPlayerQuit(leavingPlayer);
