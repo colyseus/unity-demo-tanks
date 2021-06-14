@@ -22,11 +22,17 @@ public class CameraManager : MonoBehaviour
         desiredPosition = transform.position;
     }
 
-    public void FocusOnPosition(Vector3 worldPos, bool overrideZoom = false, Action onArrival = null)
+    public void FocusOnPosition(Vector3 worldPos, float? targetZoom = null, bool overrideZoom = false, Action onArrival = null)
     {
         //Update where we zoom in to
         minDistance.x = worldPos.x;
         desiredPosition = worldPos;
+
+        if (targetZoom != null)
+        {
+            currZoom = Mathf.Clamp01((float)targetZoom);
+        }
+
         if (overrideZoom)
         {
             //Then zoom all the way in

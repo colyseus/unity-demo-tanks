@@ -45,7 +45,7 @@ public class RoomListItem : MonoBehaviour
         else if (metaData.team0 != null && metaData.team1 == null)
         {
             //Someone has made this game but they're waiting for a second player
-            if (metaData.IsUserCreator(ExampleManager.Instance.UserName))
+            if (metaData.IsUserCreator(TanksColyseusManager.Instance.UserName))
             {
                 roomStatus.text = "AWAITING CHALLENGER";
                 joinButton.interactable = true;
@@ -65,7 +65,7 @@ public class RoomListItem : MonoBehaviour
 
     public void TryJoin()
     {
-        if ((roomRef.metadata.team1 != null &&ExampleManager.Instance.UserName.Equals(roomRef.metadata.team1)) || ExampleManager.Instance.UserName.Equals(roomRef.metadata.team0))
+        if ((roomRef.metadata.team1 != null &&TanksColyseusManager.Instance.UserName.Equals(roomRef.metadata.team1)) || TanksColyseusManager.Instance.UserName.Equals(roomRef.metadata.team0))
         {
             //RE-Join a room
             menuRef.RejoinRoom(roomRef.roomId);

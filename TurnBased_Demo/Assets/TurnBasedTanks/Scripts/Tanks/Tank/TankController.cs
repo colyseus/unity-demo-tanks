@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using LucidSightTools;
+using Tanks;
 using UnityEngine;
 
 public class TankController : MonoBehaviour
@@ -55,7 +56,7 @@ public class TankController : MonoBehaviour
         }
     }
 
-    public WeaponModel ActiveWeaponData
+    public Weapon ActiveWeaponData
     {
         get
         {
@@ -144,11 +145,10 @@ public class TankController : MonoBehaviour
     {
         if (!canAct)
             return;
-
-        ExampleManager.CustomServerMethod("changeWeapon", new object[] { desIndex });
+        TanksColyseusManager.NetSend("changeWeapon", desIndex);
     }
 
-    public void UpdateSelectedWeapon(WeaponModel weapon)
+    public void UpdateSelectedWeapon(Weapon weapon)
     {
         cannon.ChangeWeapon(weapon);
     }
@@ -159,28 +159,6 @@ public class TankController : MonoBehaviour
             return;
 
         cannon.EndCharging();
-    }
-
-    public void Fire(CannonController.CannonFirePath firePath = null, DamageData damageData = null)
-    {
-        if (firePath == null && (!canAct || CurrentAP < GameRules.FiringAPCost))
-            return;
-
-        canAct = false;
-        
-        cannon.FireCannon(firePath, damageData, () =>
-        {
-            StartCoroutine(DelayAfterCannonImpact());
-        });
-        
-        cannon.EndCharging();
-    }
-
-    IEnumerator DelayAfterCannonImpact()
-    {
-        yield return new WaitForSeconds(1.0f);
-        
-        TankGameManager.Instance.FocusOnPlayer();
     }
 
     public float? AdjustAim(float delta)

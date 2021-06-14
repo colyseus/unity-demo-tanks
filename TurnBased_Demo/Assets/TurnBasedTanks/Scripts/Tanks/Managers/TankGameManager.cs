@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Colyseus.Schema;
 using LucidSightTools;
+using Tanks;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Vector2 = UnityEngine.Vector2;
 
 public class TankGameManager : MonoBehaviour
 {
@@ -13,6 +16,8 @@ public class TankGameManager : MonoBehaviour
         PLAYER_1 = 0,
         PLAYER_2
     }
+
+    public static TankGameManager Instance { get; private set; }
 
     public eTurn CurrentTurn { get; private set; }
 
@@ -27,11 +32,10 @@ public class TankGameManager : MonoBehaviour
     [SerializeField]
     private CameraManager cameraManager = null;
 
+    public ProjectileBase projectilePrefab;
+
     private TankController playerOneTank;
     private TankController playerTwoTank;
-
-    private bool fireChargeInProgress = false;
-    public static TankGameManager Instance { get; private set; }
 
     public int OurPlayerID { get; private set; } = -1;
     public string OurPlayerName { get; private set; }
@@ -39,9 +43,12 @@ public class TankGameManager : MonoBehaviour
     public string GeneralMessage { get; private set; }
     public bool IsGameOver { get; private set; } = false;
 
-    private Dictionary<string, string> attributeUpdate = new Dictionary<string, string>();
+    private Dictionary<Projectile, ProjectileBase> _projectileObjects = new Dictionary<Projectile, ProjectileBase>();
 
-    private bool _waitingForFirePath = false;
+    private bool _fireChargeInProgress = false;
+    private bool _runInitialSetupForRematch = false;
+
+    private GameObject _projectileTarget;
 
     public bool IsOurTurn
     {
@@ -62,63 +69,155 @@ public class TankGameManager : MonoBehaviour
         Instance = this;
     }
 
-    IEnumerator Start()
-    {
-        yield return new WaitForFixedUpdate();
-    }
-
     void OnEnable()
     {
         // Subscribe to events
-        ExampleRoomController.onRoomStateChanged += OnRoomStateChanged;
-        ExampleRoomController.onInitialSetup += OnInitialSetup;
-        ExampleRoomController.onTankMoved += OnPlayerMove;
-        ExampleRoomController.onReceivedFirePath += OnReceivedFirePath;
-        ExampleRoomController.onSelectedWeaponUpdated += OnSelectedWeaponUpdated;
-        ExampleRoomController.onTurnCompleted += OnTurnCompleted;
-        ExampleRoomController.onPlayerJoined += OnPlayerJoined;
-        ExampleRoomController.onPlayerQuit += OnPlayerQuit;
-        ExampleRoomController.onPlayerLeave += OnPlayerLeft;
+        TanksRoomController.onRoomStateChanged += OnRoomStateChanged;
+        TanksRoomController.onTankMoved += OnPlayerMove;
+        TanksRoomController.onWorldChanged += OnWorldChanged;
+        TanksRoomController.onPlayerChange += OnPlayerUpdated;
+        TanksRoomController.onProjectileAdded += OnProjectileAdded;
+        TanksRoomController.onProjectileRemoved += OnProjectileRemoved;
+        TanksRoomController.onProjectileUpdated += OnProjectileUpdated;
     }
 
     void OnDisable()
     {
         // Unsubscribe from events
-        ExampleRoomController.onRoomStateChanged -= OnRoomStateChanged;
-        ExampleRoomController.onInitialSetup -= OnInitialSetup;
-        ExampleRoomController.onTankMoved -= OnPlayerMove;
-        ExampleRoomController.onReceivedFirePath -= OnReceivedFirePath;
-        ExampleRoomController.onSelectedWeaponUpdated -= OnSelectedWeaponUpdated;
-        ExampleRoomController.onTurnCompleted -= OnTurnCompleted;
-        ExampleRoomController.onPlayerJoined -= OnPlayerJoined;
-        ExampleRoomController.onPlayerQuit -= OnPlayerQuit;
-        ExampleRoomController.onPlayerLeave -= OnPlayerLeft;
+        TanksRoomController.onRoomStateChanged -= OnRoomStateChanged;
+        TanksRoomController.onTankMoved -= OnPlayerMove;
+        TanksRoomController.onWorldChanged -= OnWorldChanged;
+        TanksRoomController.onPlayerChange -= OnPlayerUpdated;
+        TanksRoomController.onProjectileAdded -= OnProjectileAdded;
+        TanksRoomController.onProjectileRemoved -= OnProjectileRemoved;
+        TanksRoomController.onProjectileUpdated -= OnProjectileUpdated;
+        TanksRoomController.onWorldGridChanged -= OnWorldGridChanged;
     }
 
-    /// <summary>
-    /// Callback to handle another player joining while we are connected to the room
-    /// </summary>
-    /// <param name="playerId"></param>
-    /// <param name="playerName"></param>
-    private void OnPlayerJoined(int playerId, string playerName)
+    private void OnWorldGridChanged(string index, float value)
     {
-        if (playerId == OurPlayerID)
+        environmentBuilder.UpdateChangedGridCoordinate(index, value);
+    }
+
+    private void OnProjectileAdded(Projectile projectile)
+    {
+        if (_projectileObjects.ContainsKey(projectile) == false)
         {
-            return;
+            // Create new projectile object
+            ProjectileBase proj = Instantiate(projectilePrefab);
+            proj.transform.SetParent(Builder.groundPieceRoot);
+            proj.transform.localPosition = new Vector3(projectile.coords.x, projectile.coords.y);
+
+            _projectileObjects.Add(projectile, proj);
+
+            _projectileTarget = proj.gameObject;
+        }
+        else
+        {
+            LSLog.LogError($"On Projectile Added - Projectile has already been added!");
+        }
+    }
+
+    private void OnProjectileRemoved(Projectile projectile)
+    {
+        if (_projectileObjects.ContainsKey(projectile))
+        {
+            // Create new projectile object
+            ProjectileBase proj = _projectileObjects[projectile];
+
+            if (IsOurTurn == false && proj.gameObject == _projectileTarget)
+            {
+                StartCoroutine(Co_WaitAndRefocusPlayer());
+            }
+
+            proj.Explode();
+
+            Destroy(proj.gameObject);
+
+            _projectileObjects.Remove(projectile);
+        }
+        else
+        {
+            LSLog.LogError($"On Projectile Added - No projectile object for projectile!");
+        }
+    }
+
+    private void OnProjectileUpdated(Projectile projectile, List<DataChange> changes)
+    {
+        if (_projectileObjects.ContainsKey(projectile))
+        {
+            _projectileObjects[projectile].UpdateTargetPosition(projectile.coords);
+        }
+        else
+        {
+            LSLog.LogError($"On Projectile Update - No projectile object for projectile!");
+        }
+    }
+
+    private void OnPlayerUpdated(int playerId, List<DataChange> changes)
+    {
+        for (int i = 0; i < changes.Count; i++)
+        {
+            UpdatePlayer(playerId, changes[i]);
+        }
+    }
+
+    private void UpdatePlayer(int playerId, DataChange change)
+    {
+        TankController tank = playerId == 0 ? playerOneTank : playerTwoTank;
+        TanksState state = TanksColyseusManager.Instance.Room.State;
+
+        switch (change.Field)
+        {
+            case "currentWeapon":
+                Weapon weapon = (Weapon)state.weapons[(int)((float)change.Value)];
+                tank.UpdateSelectedWeapon(weapon);
+                break;
+            case "aimAngle":
+                if (playerId != OurPlayerID)
+                {
+                    tank.SetAim((float)change.Value);
+                }
+                break;
+            case "connected":
+                if (playerId != OurPlayerID)
+                {
+                    uiController.ToggleOnlineIndicator((bool)change.Value);
+                }
+                break;
+            case "name":
+
+                string updatedName = (string)change.Value;
+
+                if (OurPlayerID == playerId)
+                {
+                    OurPlayerName = updatedName;
+                }
+                else
+                {
+                    EnemyName = updatedName;
+                }
+
+                uiController.UpdatePlayerNames(OurPlayerName, EnemyName);
+
+                break;
+            case "currentActionPoints":
+                tank.CurrentAP = (int) ((float) change.Value);
+                break;
+            case "hp":
+                UpdatePlayerHP(state);
+
+                if ((float) change.Value == 0)
+                {
+                    tank.gameObject.SetActive(false);
+                }
+
+                break;
         }
 
-        EnemyName = playerName;
-
-        uiController.UpdatePlayerNames(OurPlayerName, playerName);
-        uiController.ToggleOnlineIndicator(true);
-
-        UpdateUI();
+        UpdateUI(state);
     }
 
-    /// <summary>
-    /// Callback to handle the other player quitting while we are connected to the room
-    /// </summary>
-    /// <param name="quittingPlayerName"></param>
     private void OnPlayerQuit(string quittingPlayerName)
     {
         string quitMsg = IsGameOver ? $"{quittingPlayerName} has left" : $"{quittingPlayerName} Surrendered!";
@@ -129,87 +228,57 @@ public class TankGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Callback to handle when a player has left the room
-    /// </summary>
-    private void OnPlayerLeft()
-    {
-        uiController.ToggleOnlineIndicator(false);
-    }
-
-    /// <summary>
-    /// Callback to handle the server response when we want to change our currently selected weapon
-    /// </summary>
-    /// <param name="selectedWeapon"></param>
-    private void OnSelectedWeaponUpdated(WeaponModel selectedWeapon)
-    {
-        if (OurPlayerID == 0)
-        {
-            playerOneTank.UpdateSelectedWeapon(selectedWeapon);
-        }
-        else
-        {
-            playerTwoTank.UpdateSelectedWeapon(selectedWeapon);
-        }
-
-        UpdateUI();
-    }
-
-    /// <summary>
-    /// Callback to handle an inbound fire path
-    /// </summary>
-    /// <param name="player">The turn Id of the player that fired/requested the fire path</param>
-    /// <param name="remainingAP">The remaining Action Points of the player</param>
-    /// <param name="firePath">The path of the projectile</param>
-    /// <param name="damageData">DamageData result at the end of the fire path</param>
-    private void OnReceivedFirePath(int player, int remainingAP, List<Vector3> firePath, DamageData damageData)
-    {
-        _waitingForFirePath = false;
-        CancelInvoke("ResetWaitForFirePath");
-
-        TankController tank = player == 0 ? playerOneTank : playerTwoTank;
-        tank.CurrentAP = remainingAP;
-
-        UpdateUI();
-
-        CannonController.CannonFirePath cannonFirePath = new CannonController.CannonFirePath(firePath.ToArray());
-
-        GetTankForCurrentTurn().Fire(cannonFirePath, damageData);
-    }
-
-    /// <summary>
     /// Callback for the room state change
     /// </summary>
     /// <param name="attributes"></param>
-    private void OnRoomStateChanged(Colyseus.Schema.MapSchema<string> attributes)
+    private void OnRoomStateChanged(TanksState state, bool isFirstState)
     {
-        if (ExampleManager.Instance.CurrentUser != null)
+        //LSLog.LogImportant($"On Room State Changed - Is First State = {isFirstState}", LSLog.LogColor.yellow);
+
+        if (isFirstState || _runInitialSetupForRematch)
+        {// First state update; run initial setup
+
+            InitialSetup(state);
+        }
+        
+        GeneralMessage = state.statusMessage;
+
+        UpdateUI(state);
+
+        // Current turn has changed
+        if (!isFirstState && (int)CurrentTurn != (int)state.currentTurn)
         {
-            ExampleManager.Instance.Room.State.networkedUsers.ForEach((str, user) =>
-            {
-                if (string.Equals(user.sessionId, ExampleManager.Instance.CurrentUser.sessionId))
-                {// Skip ourselves
-                    return;
-                }
+            SetCurrentTurn((int)state.currentTurn);
 
-                if (user.attributes != null && user.attributes.ContainsKey("aimAngle") && user.attributes.ContainsKey("turnId"))
-                {
-                    TankController tank = null;
-                    if (int.TryParse(user.attributes["turnId"], out int turnId))
-                    {
-                        tank = turnId == 0 ? playerOneTank : playerTwoTank;
-                    }
-
-                    if (tank && float.TryParse(user.attributes["aimAngle"], out float angle))
-                    {
-                        tank.SetAim(angle);
-                    }
-                }
-            });
+            StartTurn();
         }
 
-        if (attributes.ContainsKey("generalMessage"))
+        // Check if someone has quit the match
+        if (state.inProcessOfQuitingGame)
         {
-            GeneralMessage = attributes["generalMessage"];
+            // Get the name of the other player that quit
+            int otherPlayerId = OurPlayerID == 0 ? 1 : 0;
+
+            OnPlayerQuit(state.players[otherPlayerId].name);
+        }
+    }
+
+    private void OnWorldChanged(List<DataChange> changes)
+    {
+        for (int i = 0; i < changes.Count; i++)
+        {
+            if (string.Equals(changes[i].Field, "grid"))
+            {
+                // We got a new world
+                ReceiveWorldMap(TanksColyseusManager.Instance.Room.State.world);
+
+                // If we're currently in a Game Over State it means we're starting a new round of play
+                if (IsGameOver)
+                {
+                    _runInitialSetupForRematch = true;
+                }
+            }
+
         }
     }
 
@@ -217,145 +286,103 @@ public class TankGameManager : MonoBehaviour
     /// Pass the terrain map to the environment builder
     /// </summary>
     /// <param name="mapMatrix"></param>
-    private void ReceiveWorldMap(List<List<int>> mapMatrix)
+    private void ReceiveWorldMap(World world)
     {
-        environmentBuilder.BuildEnvironment(mapMatrix);
+        environmentBuilder.BuildEnvironment(world);
     }
 
-    /// <summary>
-    /// Callback to handle the end of a player's turn
-    /// </summary>
-    /// <param name="wasSkip">Flag for if the turn ended because a player skipped their turn</param>
-    private void OnTurnCompleted(bool wasSkip)
+    private Player GetChallengerPlayer(TanksState state)
     {
-        StartCoroutine(Co_DelayTurnEnd(wasSkip ? 0 : 2.0f));
+        int challengerId = OurPlayerID == 0 ? 1 : 0;
+
+        return state.players[challengerId];
     }
 
-    /// <summary>
-    /// Wait the delay before transitioning to next turn
-    /// </summary>
-    /// <param name="delay"></param>
-    /// <returns></returns>
-    IEnumerator Co_DelayTurnEnd(float delay)
+    private Player GetOurPlayer(TanksState state)
     {
-        yield return new WaitForSecondsRealtime(delay);
-
-        EndTurn();
+        return state.players[OurPlayerID];
     }
 
-    /// <summary>
-    /// Callback to handle the data that comes in for the initial setup after connecting to a room or for a rematch
-    /// </summary>
-    /// <param name="playerTurnId">The turn Id of this client</param>
-    /// <param name="playerTurn">The current player turn number</param>
-    /// <param name="currentAP">The remaining Action Points of the player whose current turn it is</param>
-    /// <param name="playerNames">Array of player names</param>
-    /// <param name="playerHP">Array of player Hit Points</param>
-    /// <param name="currentWeapon">Our tank's current weapon</param>
-    /// <param name="mapMatrix">The current terrain matrix</param>
-    private void OnInitialSetup(int playerTurnId, int playerTurn, int currentAP, string[] playerNames, int[] playerHP, WeaponModel currentWeapon, List<List<int>> mapMatrix, bool challengerOnline)
+    private void InitialSetup(TanksState state)
     {
         IsGameOver = false;
+        _runInitialSetupForRematch = false;
 
-        // a negative playerTurnId indicates the setup data is for a rematch
-        if (playerTurnId >= 0)
+        // Determine our player Id
+        state.players.ForEach((player) =>
         {
-            OurPlayerID = playerTurnId;
-        }
+            if (string.Equals(player.sessionId, TanksColyseusManager.Instance.Room.SessionId))
+            {
+                OurPlayerID = (int) player.playerId;
+            }
+        });
 
-        ReceiveWorldMap(mapMatrix);
-
-        SetCurrentTurn(playerTurn);
+        SetCurrentTurn((int)state.currentTurn);
 
         TankController ourTank = GetOurTank();
 
-        ourTank.UpdateSelectedWeapon(currentWeapon);
-
-        // Set the AP for the active tank as received from the server
-        GetTankForCurrentTurn().CurrentAP = currentAP;
-        GetTankForCurrentTurn().ignoreAPReset = true;
+        ourTank.UpdateSelectedWeapon(state.weapons[(int)GetOurPlayer(state).currentWeapon]);
 
         uiController.HideGameOverUI();
-        uiController.ToggleOnlineIndicator(challengerOnline);
+        uiController.ToggleOnlineIndicator(GetChallengerPlayer(state).connected);
 
-        UpdatePlayerNames(playerNames);
-        UpdatePlayerHP(playerHP);
-        UpdateUI();
+        UpdatePlayerNames(state);
+        UpdatePlayerHP(state);
+        
+        _fireChargeInProgress = false;
 
-        _waitingForFirePath = false;
-        fireChargeInProgress = false;
+        uiController.ToggleLoadingCover(false);
 
         StartTurn();
 
-        uiController.ToggleLoadingCover(false);
+        TanksRoomController.onWorldGridChanged += OnWorldGridChanged;
     }
 
     /// <summary>
     /// Updates the displayed player names
     /// </summary>
     /// <param name="playerNames">Array of player names</param>
-    private void UpdatePlayerNames(string[] playerNames)
+    private void UpdatePlayerNames(TanksState state)
     {
         OurPlayerName = "";
         EnemyName = "";
 
-        if (playerNames != null && playerNames.Length > 1)
+        if (OurPlayerID == 0)
         {
-            if (OurPlayerID == 0)
-            {
-                OurPlayerName = playerNames[0];
-                EnemyName = playerNames[1];
-            }
-            else
-            {
-                OurPlayerName = playerNames[1];
-                EnemyName = playerNames[0];
-            }
+            OurPlayerName = state.players[0].name;
+            EnemyName = state.players[1].name;
         }
-        else if (playerNames != null && playerNames.Length > 0)
+        else
         {
-            OurPlayerName = playerNames[0];
+            OurPlayerName = state.players[1].name;
+            EnemyName = state.players[0].name;
         }
-        
 
         uiController.UpdatePlayerNames(OurPlayerName, EnemyName);
 
     }
 
-    private void UpdatePlayerHP(int[] playerHP)
+    private void UpdatePlayerHP(TanksState state)
     {
-        if (playerHP != null && playerHP.Length > 1)
+        if (OurPlayerID == 0)
         {
-            if (OurPlayerID == 0)
-            {
-                uiController.UpdateHitPoints(playerHP[0], true);
-                uiController.UpdateHitPoints(playerHP[1], false);
-            }
-            else
-            {
-                uiController.UpdateHitPoints(playerHP[1], true);
-                uiController.UpdateHitPoints(playerHP[0], false);
-            }
-
-            if (playerHP[0] == 0)
-            {
-                GameOver(1);
-            }
-            else if (playerHP[1] == 0)
-            {
-                GameOver(0);
-            }
+            uiController.UpdateHitPoints((int)state.players[0].hp, true);
+            uiController.UpdateHitPoints((int)state.players[1].hp, false);
         }
-        else if (playerHP != null && playerHP.Length > 0)
+        else
         {
-            uiController.UpdateHitPoints(playerHP[0], true);
-
-            if (playerHP[0] == 0)
-            {
-                GameOver(1);
-            }
+            uiController.UpdateHitPoints((int)state.players[1].hp, true);
+            uiController.UpdateHitPoints((int)state.players[0].hp, false);
         }
 
+        if ((int)state.players[0].hp == 0)
+        {
+            GameOver(1);
+        }
+        else if ((int)state.players[1].hp == 0)
+        {
+            GameOver(0);
+        }
     }
 
     private void SetCurrentTurn(int turn)
@@ -367,18 +394,15 @@ public class TankGameManager : MonoBehaviour
     /// Callback to handle player movement updates
     /// </summary>
     /// <param name="player">The turn Id of the player that has moved</param>
-    /// <param name="remainingAP">The remaining Action Points of the player that has moved</param>
     /// <param name="newCoords">The new position of the player that has moved</param>
-    private void OnPlayerMove(int player, int remainingAP, Vector2 newCoords)
+    private void OnPlayerMove(int player, Tanks.Vector2 newCoords)
     {
         TankController tank = player == 0 ? playerOneTank : playerTwoTank;
-        tank.CurrentAP = remainingAP;
         tank.Move(new EnvironmentBuilder.MapCoordinates((int)newCoords.x, (int)newCoords.y), player == 0);
 
         Vector3 newWorldPos = environmentBuilder.CoordinateToWorldPosition(tank.mapCoords);
-        FocusOnPosition(newWorldPos, false, null);
-        UpdateUI();
-
+        FocusOnPosition(newWorldPos, overrideZoom: false, onArrival: null);
+        UpdateUI(TanksColyseusManager.Instance.Room.State);
     }
 
     /// <summary>
@@ -386,10 +410,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void RequestRematch()
     {
-        attributeUpdate.Clear();
-        attributeUpdate.Add("readyState", "ready");
-
-        ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.CurrentUser.sessionId, attributesToSet = attributeUpdate });
+        TanksColyseusManager.NetSend("requestRematch");
     }
 
     /// <summary>
@@ -397,7 +418,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void QuitMatch()
     {
-        ExampleManager.CustomServerMethod("quitGame", new object[] {});
+        TanksColyseusManager.NetSend("quitGame");
 
         ReturnToLobby();
     }
@@ -407,7 +428,7 @@ public class TankGameManager : MonoBehaviour
     /// </summary>
     public void ReturnToLobby()
     {
-        ExampleManager.Instance.LeaveAllRooms(() => { SceneManager.LoadScene(0); });
+        TanksColyseusManager.Instance.LeaveAllRooms(() => { SceneManager.LoadScene(0); });
     }
 
     /// <summary>
@@ -419,6 +440,9 @@ public class TankGameManager : MonoBehaviour
         uiController.ShowGameOverUI(winningPlayer);
 
         IsGameOver = true;
+
+        // Unsubscribe from grid changes until the next game gets initialized
+        TanksRoomController.onWorldGridChanged -= OnWorldGridChanged;
     }
 
     /// <summary>
@@ -438,28 +462,17 @@ public class TankGameManager : MonoBehaviour
     public void FocusOnPlayer()
     {
         TankController activeTank = GetTankForCurrentTurn();
-        FocusOnPosition(activeTank.transform.position, true, () => { activeTank.AllowAction(true); });
+        FocusOnPosition(activeTank.transform.position, zoom: 0.75f, false, onArrival: () => { activeTank.AllowAction(true); });
     }
 
-    public void EndTurn()
+    public void FocusOnPosition(Vector3 worldPosition, float? zoom = null, bool overrideZoom = false, Action onArrival = null)
     {
-        fireChargeInProgress = false;
-        GetTankForCurrentTurn().AbortCharge();
-        GetTankForCurrentTurn().ignoreAPReset = false;
-        CurrentTurn = CurrentTurn == eTurn.PLAYER_1 ? eTurn.PLAYER_2 : eTurn.PLAYER_1;
-        StartTurn();
-
-        UpdateUI();
-    }
-
-    public void FocusOnPosition(Vector3 worldPosition, bool overrideZoom, Action onArrival)
-    {
-        cameraManager.FocusOnPosition(worldPosition, overrideZoom, onArrival);
+        cameraManager.FocusOnPosition(worldPosition, targetZoom: zoom, overrideZoom: overrideZoom, onArrival: onArrival);
     }
 
     private void StartTurn()
     {
-        fireChargeInProgress = false;
+        _fireChargeInProgress = false;
         GetTankForCurrentTurn().BeginTurn();
         GetTankForCurrentTurn().AllowAction(false);
         
@@ -474,6 +487,11 @@ public class TankGameManager : MonoBehaviour
         }
 
         HandleInput();
+
+        if (IsOurTurn == false && _projectileTarget)
+        {
+            cameraManager.FocusOnPosition(_projectileTarget.transform.position, 0.5f);
+        }
     }
 
     private void HandleInput()
@@ -492,9 +510,9 @@ public class TankGameManager : MonoBehaviour
         if (activeTank == null || activeTank.CanAct() == false)
             return;
 
-        bool updateUI = activeTank.CheckHotkeys();
+        activeTank.CheckHotkeys();
 
-        if (fireChargeInProgress == false && Input.GetAxisRaw("Horizontal") != 0.0f)
+        if (_fireChargeInProgress == false && Input.GetAxisRaw("Horizontal") != 0.0f)
         {
             MoveTank(Input.GetAxisRaw("Horizontal"));
         }
@@ -509,57 +527,48 @@ public class TankGameManager : MonoBehaviour
             }
         }
 
-        if (Input.GetMouseButtonDown(0))
+        if (GetCurrentTurnAP(TanksColyseusManager.Instance.Room.State) >= GameRules.FiringAPCost && Input.GetMouseButtonDown(0))
         {
-            fireChargeInProgress = true;
+            _fireChargeInProgress = true;
             GetTankForCurrentTurn().StartChargeCannon();
         }
 
         if (Input.GetMouseButtonDown(1))
         {
-            fireChargeInProgress = false;
+            _fireChargeInProgress = false;
             GetTankForCurrentTurn().AbortCharge();
         }
 
         if (Input.GetMouseButtonUp(0) && GetTankForCurrentTurn().CurrentAP >= GameRules.FiringAPCost)
         {
-            if (_waitingForFirePath == false && fireChargeInProgress)
+            if (_fireChargeInProgress)
             {
-                RequestFirePath();
+                AttemptWeaponFire();
             }
 
-            fireChargeInProgress = false;
+            _fireChargeInProgress = false;
             GetTankForCurrentTurn().AbortCharge();
         }
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
             //Skip remainder of turn
-            ExampleManager.CustomServerMethod("skipTurn", new object[] {});
-        }
-
-        if (updateUI)
-        {
-            UpdateUI();
+            TanksColyseusManager.NetSend("skipTurn");
         }
     }
 
     /// <summary>
-    /// Send a request to the server for the firing path of our tank
+    /// Send a request to the server to fire our weapon
     /// </summary>
-    private void RequestFirePath()
+    private void AttemptWeaponFire()
     {
-        _waitingForFirePath = true;
-
         TankController tank = GetTankForCurrentTurn();
 
-        ExampleVector3Obj barrelForward = new ExampleVector3Obj(tank.BarrelForward);
-        ExampleVector3Obj barrelPosition = new ExampleVector3Obj(environmentBuilder.groundPieceRoot.InverseTransformPoint(tank.BarrelPosition));
+        Vector3Obj barrelForward = new Vector3Obj(tank.BarrelForward);
+        Vector3Obj barrelPosition = new Vector3Obj(environmentBuilder.groundPieceRoot.InverseTransformPoint(tank.BarrelPosition));
 
-        ExampleManager.CustomServerMethod("getFirePath", new object[] { barrelForward, barrelPosition, tank.CannonPower });
-
-        // Reset flag for waiting for fire path if the request times out
-        Invoke("ResetWaitForFirePath", 5.0f);
+        TanksColyseusManager.NetSend("fireWeapon", new FireWeaponMessage() { barrelForward = barrelForward, barrelPosition = barrelPosition, cannonPower = tank.CannonPower });
+        
     }
 
     /// <summary>
@@ -568,11 +577,7 @@ public class TankGameManager : MonoBehaviour
     /// <param name="aimAngle"></param>
     private void SendAimAngle(float aimAngle)
     {
-        attributeUpdate.Clear();
-
-        attributeUpdate.Add("aimAngle", aimAngle.ToString());
-
-        ExampleManager.NetSend("setAttribute", new ExampleAttributeUpdateMessage() { userId = ExampleManager.Instance.CurrentUser.sessionId, attributesToSet = attributeUpdate });
+        TanksColyseusManager.NetSend("setAimAngle", aimAngle);
     }
 
     /// <summary>
@@ -602,14 +607,47 @@ public class TankGameManager : MonoBehaviour
         return playerTwoTank;
     }
 
-    private void UpdateUI()
+    private int GetCurrentTurnAP(TanksState state)
     {
-        uiController.UpdateActionPoints(GetTankForCurrentTurn().CurrentAP);
-        uiController.SetActiveWeaponName(IsOurTurn ? GetTankForCurrentTurn().ActiveWeaponData.name : "");
-        uiController.SetCurrentPlayer(IsOurTurn ? OurPlayerName : EnemyName);
+        Player player = GetCurrentTurnPlayer(state);
+
+        if (player == null)
+        {
+            LSLog.LogError($"Error getting player for current turn!");
+
+            return -1;
+        }
+
+        return (int)player.currentActionPoints;
+    }
+
+    private Weapon GetCurrentTurnWeapon(TanksState state)
+    {
+        Player player = GetCurrentTurnPlayer(state);
+
+        if (player == null)
+        {
+            LSLog.LogError($"Error getting player for current weapon!");
+
+            return null;
+        }
+
+        return (Weapon)state.weapons[(int)player.currentWeapon];
+    }
+
+    private Player GetCurrentTurnPlayer(TanksState state)
+    {
+        return (Player)state.players[(int)state.currentTurn];
+    }
+
+    private void UpdateUI(TanksState state)
+    {
+        uiController.UpdateActionPoints(GetCurrentTurnAP(state));
+        uiController.SetActiveWeaponName(GetCurrentTurnWeapon(state).name);
+        uiController.SetCurrentPlayer(GetCurrentTurnPlayer(state).name);
 
         if (environmentBuilder.mapMatrix != null)
-            uiController.UpdateMap(environmentBuilder.mapMatrix);
+            uiController.UpdateMap(environmentBuilder);
     }
 
     /// <summary>
@@ -642,70 +680,13 @@ public class TankGameManager : MonoBehaviour
     /// <param name="direction"></param>
     public void AttemptMove(int direction)
     {
-        ExampleManager.CustomServerMethod("movePlayer", new object[] {direction});
+        TanksColyseusManager.NetSend("movePlayer", direction);
     }
 
-    /// <summary>
-    /// For when a projectile has reached the end of its path and explodes.  Apply the damage data to the terrain and any affected players.
-    /// </summary>
-    /// <param name="damageData"></param>
-    public void RegisterExplosion(DamageData damageData)
+    private IEnumerator Co_WaitAndRefocusPlayer()
     {
-        // Update environment
-        environmentBuilder.DamageDealt(damageData);
+        yield return new WaitForSeconds(1.0f);
 
-        // Update tanks
-        if (damageData != null && damageData.updatedPlayers != null)
-        {
-            for (int i = 0; i < damageData.updatedPlayers.Count; i++)
-            {
-                UpdatedPlayer updatedPlayer = damageData.updatedPlayers[i];
-                
-                uiController.UpdateHitPoints(updatedPlayer.remainingHP, updatedPlayer.playerId == OurPlayerID);
-                
-                if (updatedPlayer.playerId == 0)
-                {
-                    if (updatedPlayer.playerPos != null)
-                    {
-                        // Move the tank to the updated position
-                        playerOneTank.MoveToNewCoordinates(new EnvironmentBuilder.MapCoordinates((int)((Vector2)updatedPlayer.playerPos).x, (int)((Vector2)updatedPlayer.playerPos).y), true);
-                    }
-
-                    if (updatedPlayer.remainingHP == 0)
-                    {
-                        // Player 1 tank has been destroyed
-                        playerOneTank.Destroyed();
-
-                        GameOver(1);
-                    }
-                }
-                else
-                {
-                    if (updatedPlayer.playerPos != null)
-                    {
-                        // Move the tank to the updated position
-                        playerTwoTank.MoveToNewCoordinates(new EnvironmentBuilder.MapCoordinates((int)((Vector2)updatedPlayer.playerPos).x, (int)((Vector2)updatedPlayer.playerPos).y), true);
-                    }
-
-                    if (updatedPlayer.remainingHP == 0)
-                    {
-                        // Player 2 tank has been destroyed
-                        playerTwoTank.Destroyed();
-
-                        GameOver(0);
-                    }
-                }
-            }
-        }
-
+        FocusOnPlayer();
     }
-
-    /// <summary>
-    /// Callback to reset the bool flag after a request to get a firing path has timed out
-    /// </summary>
-    private void ResetWaitForFirePath()
-    {
-        _waitingForFirePath = false;
-    }
-
 }
